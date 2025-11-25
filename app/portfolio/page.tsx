@@ -41,10 +41,6 @@ async function PhotoGallery() {
 
   // Filter out folders and get public URLs
   const photoFiles = files.filter((file) => file.name !== ".emptyFolderPlaceholder");
-  
-  const { data: { publicUrl } } = supabase.storage
-    .from("photos")
-    .getPublicUrl("");
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
