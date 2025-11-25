@@ -15,6 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Camera, Menu } from "lucide-react";
 import { useState } from "react";
+import { ThemeSwitcher } from "@/components/theme-switcher";
 
 export function Nav() {
   const pathname = usePathname();
@@ -59,10 +60,14 @@ export function Nav() {
                 ))}
               </NavigationMenuList>
             </NavigationMenu>
+            <div className="ml-4">
+              <ThemeSwitcher />
+            </div>
           </div>
 
           {/* Mobile Navigation */}
-          <div className="md:hidden">
+          <div className="md:hidden flex items-center space-x-2">
+            <ThemeSwitcher />
             <Button
               variant="ghost"
               size="icon"

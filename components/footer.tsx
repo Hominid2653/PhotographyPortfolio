@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Camera, Instagram, Facebook, Twitter, Mail, Phone } from "lucide-react";
+import { ThemeSwitcher } from "@/components/theme-switcher";
 
 export function Footer() {
   return (
@@ -90,11 +91,17 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-8 pt-8 border-t border-border text-center text-sm text-muted-foreground">
-          <p>
-            © {new Date().getFullYear()} Hominid Photography. All rights
-            reserved. | Photographer: Elias Cheruiyot
-          </p>
+        <div className="mt-8 pt-8 border-t border-border">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-sm text-muted-foreground text-center sm:text-left">
+              © {new Date().getFullYear()} Hominid Photography. All rights
+              reserved. | Photographer: Elias Cheruiyot
+            </p>
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-muted-foreground">Theme:</span>
+              <ThemeSwitcher />
+            </div>
+          </div>
         </div>
       </div>
     </footer>

@@ -2386,3 +2386,298 @@ The website is ready. All pages are responsive and use ShadCN components for con
 
 ---
 
+_**User (2025-11-25 07:07Z)**_
+
+Let's be able to switch between dark mode and light mode and light mode be the default
+
+---
+
+_**Agent (model default, mode Agent)**_
+
+
+
+---
+
+
+Checking the current theme setup and updating it so light mode is the default and the switcher is accessible.
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: components/theme-switcher.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: app/layout.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "ThemeSwitcher" • 4 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `.\app\protected\layout.tsx` | `import \{ ThemeSwitcher \} from "@/components/theme-switcher";` | L2 |
+| `.\app\protected\layout.tsx` | `<ThemeSwitcher />` | L39 |
+| `.\components\theme-switcher.tsx` | `const ThemeSwitcher = () => \{` | L15 |
+| `.\components\theme-switcher.tsx` | `export \{ ThemeSwitcher \};` | L78 |
+
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Updating the default theme to light and adding the theme switcher to the navigation so it's accessible on all pages.
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **code_edit** • Edit file: app/layout.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -30,5 +30,5 @@
+          &lt;ThemeProvider
+            attribute=&quot;class&quot;
+-           defaultTheme=&quot;system&quot;
++           defaultTheme=&quot;light&quot;
+            enableSystem
+            disableTransitionOnChange
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: components/nav.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Adding the theme switcher to the navigation component:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **code_edit** • Edit file: components/nav.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -16,4 +16,5 @@
+  import { Camera, Menu } from &quot;lucide-react&quot;;
+  import { useState } from &quot;react&quot;;
++ import { ThemeSwitcher } from &quot;@/components/theme-switcher&quot;;
+  
+  export function Nav() {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **code_edit** • Edit file: components/nav.tsx</summary>
+
+**Chunk 1**
+Lines added: 3, lines removed: undefined
+
+```diff
+@@ -61,4 +61,7 @@
+                &lt;/NavigationMenuList&gt;
+              &lt;/NavigationMenu&gt;
++             &lt;div className=&quot;ml-4&quot;&gt;
++               &lt;ThemeSwitcher /&gt;
++             &lt;/div&gt;
+            &lt;/div&gt;
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **code_edit** • Edit file: components/nav.tsx</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: 1
+
+```diff
+@@ -67,5 +67,6 @@
+  
+            {/* Mobile Navigation */}
+-           &lt;div className=&quot;md:hidden&quot;&gt;
++           &lt;div className=&quot;md:hidden flex items-center space-x-2&quot;&gt;
++             &lt;ThemeSwitcher /&gt;
+              &lt;Button
+                variant=&quot;ghost&quot;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: components/footer.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Adding the theme switcher to the footer:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **code_edit** • Edit file: components/footer.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -1,4 +1,5 @@
+  import Link from &quot;next/link&quot;;
+  import { Camera, Instagram, Facebook, Twitter, Mail, Phone } from &quot;lucide-react&quot;;
++ import { ThemeSwitcher } from &quot;@/components/theme-switcher&quot;;
+  
+  export function Footer() {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **code_edit** • Edit file: components/footer.tsx</summary>
+
+**Chunk 1**
+Lines added: 11, lines removed: 5
+
+```diff
+@@ -92,9 +92,15 @@
+          &lt;/div&gt;
+  
+-         &lt;div className=&quot;mt-8 pt-8 border-t border-border text-center text-sm text-muted-foreground&quot;&gt;
+-           &lt;p&gt;
+-             © {new Date().getFullYear()} Hominid Photography. All rights
+-             reserved. | Photographer: Elias Cheruiyot
+-           &lt;/p&gt;
++         &lt;div className=&quot;mt-8 pt-8 border-t border-border&quot;&gt;
++           &lt;div className=&quot;flex flex-col sm:flex-row items-center justify-between gap-4&quot;&gt;
++             &lt;p className=&quot;text-sm text-muted-foreground text-center sm:text-left&quot;&gt;
++               © {new Date().getFullYear()} Hominid Photography. All rights
++               reserved. | Photographer: Elias Cheruiyot
++             &lt;/p&gt;
++             &lt;div className=&quot;flex items-center gap-4&quot;&gt;
++               &lt;span className=&quot;text-sm text-muted-foreground&quot;&gt;Theme:&lt;/span&gt;
++               &lt;ThemeSwitcher /&gt;
++             &lt;/div&gt;
++           &lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 3 files</summary>
+      
+Lint paths:
+
+- `components/nav.tsx`
+- `components/footer.tsx`
+- `app/layout.tsx`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+## Changes made
+
+1. **Set light mode as default** — Updated `app/layout.tsx` to use `defaultTheme="light"` instead of `"system"`.
+
+2. **Added theme switcher to navigation** — Added the theme switcher to the main navigation:
+   - Desktop: appears next to the navigation menu items
+   - Mobile: appears next to the hamburger menu button
+
+3. **Added theme switcher to footer** — Added it to the footer for easy access.
+
+The theme switcher is now accessible on all pages. Users can switch between:
+- Light mode (default)
+- Dark mode
+- System (follows OS preference)
+
+The switcher shows the current theme icon (Sun for light, Moon for dark, Laptop for system) and opens a dropdown to change themes. The preference is saved and persists across sessions.
+
+---
+
