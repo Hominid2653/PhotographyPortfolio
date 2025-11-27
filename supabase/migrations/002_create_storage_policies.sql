@@ -1,4 +1,6 @@
 -- Create storage bucket if it doesn't exist
+-- Note: Storage policies cannot be created via SQL due to permissions.
+-- You must create them through the Supabase Dashboard (see instructions below).
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'photos',
@@ -13,42 +15,39 @@ set
   file_size_limit = 52428800,
   allowed_mime_types = ARRAY['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
 
--- Enable RLS on storage.objects
--- Note: RLS should already be enabled, but this ensures it's on
-alter table storage.objects enable row level security;
-
--- Drop existing policies if they exist (to avoid conflicts on re-run)
-drop policy if exists "Public can view photos" on storage.objects;
-drop policy if exists "Authenticated users can upload photos" on storage.objects;
-drop policy if exists "Authenticated users can update photos" on storage.objects;
-drop policy if exists "Authenticated users can delete photos" on storage.objects;
-
--- Policy 1: Allow public read access to photos
-create policy "Public can view photos"
-on storage.objects
-for select
-to public
-using (bucket_id = 'photos');
-
--- Policy 2: Allow authenticated users to upload photos
-create policy "Authenticated users can upload photos"
-on storage.objects
-for insert
-to authenticated
-with check (bucket_id = 'photos');
-
--- Policy 3: Allow authenticated users to update photos
-create policy "Authenticated users can update photos"
-on storage.objects
-for update
-to authenticated
-using (bucket_id = 'photos')
-with check (bucket_id = 'photos');
-
--- Policy 4: Allow authenticated users to delete photos
-create policy "Authenticated users can delete photos"
-on storage.objects
-for delete
-to authenticated
-using (bucket_id = 'photos');
+-- ============================================================================
+-- IMPORTANT: Storage policies must be created via the Dashboard
+-- ============================================================================
+-- After running this SQL, go to Storage > Policies in your Supabase Dashboard
+-- and create the following policies for the 'photos' bucket:
+--
+-- Policy 1: "Public can view photos"
+--   - Operation: SELECT
+--   - Target roles: anon, authenticated
+--   - USING expression: bucket_id = 'photos'
+--
+-- Policy 2: "Authenticated users can upload photos"
+--   - Operation: INSERT
+--   - Target roles: authenticated
+--   - WITH CHECK expression: bucket_id = 'photos'
+--
+-- Policy 3: "Authenticated users can update photos"
+--   - Operation: UPDATE
+--   - Target roles: authenticated
+--   - USING expression: bucket_id = 'photos'
+--   - WITH CHECK expression: bucket_id = 'photos'
+--
+-- Policy 4: "Authenticated users can delete photos"
+--   - Operation: DELETE
+--   - Target roles: authenticated
+--   - USING expression: bucket_id = 'photos'
+--
+-- Steps:
+-- 1. Go to Storage in Supabase Dashboard
+-- 2. Click on the 'photos' bucket
+-- 3. Go to the "Policies" tab
+-- 4. Click "New Policy" for each policy above
+-- 5. Use "For full customization" option
+-- 6. Copy the expressions above
+-- ============================================================================
 
