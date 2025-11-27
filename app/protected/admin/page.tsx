@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -13,16 +14,30 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Upload, Trash2, Image as ImageIcon, Loader2 } from "lucide-react";
+import { Upload, Trash2, Loader2, Eye, EyeOff, Star } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { getAllPhotosClient, uploadPhotoClient, deletePhotoClient, updatePhotoClient } from "@/lib/photos-client";
+import type { PhotoWithUrl } from "@/lib/photos";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function AdminPage() {
-  const [photos, setPhotos] = useState<any[]>([]);
+  const [photos, setPhotos] = useState<PhotoWithUrl[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [photoToDelete, setPhotoToDelete] = useState<PhotoWithUrl | null>(null);
   const router = useRouter();
   const supabase = createClient();
 
@@ -41,19 +56,8 @@ export default function AdminPage() {
   const loadPhotos = async () => {
     try {
       setLoading(true);
-      const { data: files, error } = await supabase.storage
-        .from("photos")
-        .list("", {
-          limit: 100,
-          offset: 0,
-          sortBy: { column: "created_at", order: "desc" },
-        });
-
-      if (error) throw error;
-
-      const photoFiles =
-        files?.filter((file) => file.name !== ".emptyFolderPlaceholder") || [];
-      setPhotos(photoFiles);
+      const allPhotos = await getAllPhotosClient();
+      setPhotos(allPhotos);
     } catch (error) {
       console.error("Error loading photos:", error);
     } finally {
@@ -74,21 +78,9 @@ export default function AdminPage() {
       setUploading(true);
 
       for (const file of selectedFiles) {
-        const fileExt = file.name.split(".").pop();
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-        const filePath = fileName;
-
-        const { error: uploadError } = await supabase.storage
-          .from("photos")
-          .upload(filePath, file, {
-            cacheControl: "3600",
-            upsert: false,
-          });
-
-        if (uploadError) {
-          console.error("Error uploading file:", uploadError);
-          throw uploadError;
-        }
+        await uploadPhotoClient(file, {
+          is_visible: true,
+        });
       }
 
       setSelectedFiles([]);
@@ -102,18 +94,18 @@ export default function AdminPage() {
     }
   };
 
-  const handleDelete = async (fileName: string) => {
-    if (!confirm(`Are you sure you want to delete ${fileName}?`)) {
-      return;
-    }
+  const handleDeleteClick = (photo: PhotoWithUrl) => {
+    setPhotoToDelete(photo);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!photoToDelete?.id) return;
 
     try {
-      const { error } = await supabase.storage
-        .from("photos")
-        .remove([fileName]);
-
-      if (error) throw error;
-
+      await deletePhotoClient(photoToDelete.id);
+      setDeleteDialogOpen(false);
+      setPhotoToDelete(null);
       await loadPhotos();
     } catch (error) {
       console.error("Error deleting photo:", error);
@@ -121,9 +113,32 @@ export default function AdminPage() {
     }
   };
 
-  const getImageUrl = (fileName: string) => {
-    const { data } = supabase.storage.from("photos").getPublicUrl(fileName);
-    return data.publicUrl;
+  const toggleVisibility = async (photo: PhotoWithUrl) => {
+    if (!photo.id) return;
+
+    try {
+      await updatePhotoClient(photo.id, {
+        is_visible: !photo.is_visible,
+      });
+      await loadPhotos();
+    } catch (error) {
+      console.error("Error updating photo:", error);
+      alert("Failed to update photo. Please try again.");
+    }
+  };
+
+  const toggleFeatured = async (photo: PhotoWithUrl) => {
+    if (!photo.id) return;
+
+    try {
+      await updatePhotoClient(photo.id, {
+        is_featured: !photo.is_featured,
+      });
+      await loadPhotos();
+    } catch (error) {
+      console.error("Error updating photo:", error);
+      alert("Failed to update photo. Please try again.");
+    }
   };
 
   return (
@@ -212,42 +227,130 @@ export default function AdminPage() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {photos.map((photo) => {
-              const imageUrl = getImageUrl(photo.name);
-              return (
-                <Card key={photo.name} className="overflow-hidden">
-                  <div className="relative aspect-square w-full overflow-hidden bg-muted">
-                    <Image
-                      src={imageUrl}
-                      alt={photo.name}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
-                    />
-                  </div>
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium truncate flex-1 mr-2">
-                        {photo.name}
+            {photos.map((photo) => (
+              <Card key={photo.id} className="overflow-hidden">
+                <div className="relative aspect-square w-full overflow-hidden bg-muted group">
+                  <Image
+                    src={photo.url}
+                    alt={photo.title || photo.file_name}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+                  />
+                  {photo.is_featured && (
+                    <div className="absolute top-2 left-2">
+                      <div className="bg-yellow-500 text-white px-2 py-1 rounded text-xs font-semibold flex items-center gap-1">
+                        <Star className="h-3 w-3 fill-current" />
+                        Featured
+                      </div>
+                    </div>
+                  )}
+                  {!photo.is_visible && (
+                    <div className="absolute top-2 right-2">
+                      <div className="bg-gray-600 text-white px-2 py-1 rounded text-xs font-semibold">
+                        Hidden
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <CardContent className="p-4">
+                  <div className="space-y-2">
+                    <div>
+                      <p className="text-sm font-medium truncate">
+                        {photo.title || photo.file_name}
                       </p>
+                      {photo.title && (
+                        <p className="text-xs text-muted-foreground truncate">
+                          {photo.file_name}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => toggleVisibility(photo)}
+                          className="h-8 w-8"
+                          title={photo.is_visible ? "Hide photo" : "Show photo"}
+                        >
+                          {photo.is_visible ? (
+                            <Eye className="h-4 w-4" />
+                          ) : (
+                            <EyeOff className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => toggleFeatured(photo)}
+                          className={`h-8 w-8 ${
+                            photo.is_featured
+                              ? "text-yellow-500 hover:text-yellow-600"
+                              : ""
+                          }`}
+                          title={
+                            photo.is_featured
+                              ? "Remove from featured"
+                              : "Mark as featured"
+                          }
+                        >
+                          <Star
+                            className={`h-4 w-4 ${
+                              photo.is_featured ? "fill-current" : ""
+                            }`}
+                          />
+                        </Button>
+                      </div>
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleDelete(photo.name)}
-                        className="text-destructive hover:text-destructive"
+                        onClick={() => handleDeleteClick(photo)}
+                        className="text-destructive hover:text-destructive h-8 w-8"
+                        title="Delete photo"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {new Date(photo.created_at).toLocaleDateString()}
-                    </p>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                    <div className="text-xs text-muted-foreground space-y-1">
+                      {photo.width && photo.height && (
+                        <p>
+                          {photo.width} × {photo.height}px
+                        </p>
+                      )}
+                      <p>
+                        {photo.created_at &&
+                          new Date(photo.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         )}
+
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete the photo &quot;
+                {photoToDelete?.title || photoToDelete?.file_name}&quot;. This
+                action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

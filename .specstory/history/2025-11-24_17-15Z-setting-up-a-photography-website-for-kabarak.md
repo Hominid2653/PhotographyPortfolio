@@ -2681,3 +2681,1703 @@ The switcher shows the current theme icon (Sun for light, Moon for dark, Laptop 
 
 ---
 
+_**User (2025-11-25 07:07Z)**_
+
+Now let's work on the hsupabase storage and the sql for the uploads then after that we'll work on the admin page for uploading
+
+---
+
+_**Agent (model default, mode Agent)**_
+
+
+
+---
+
+
+Setting up Supabase storage and SQL tables for photo uploads. Checking the current setup, then creating the necessary SQL migrations and storage configuration.
+
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="codebase_search">
+<details>
+                <summary>Tool use: **codebase_search** • Searched codebase "How are database tables or migrations set up in this project?" • **14** results</summary>
+            
+| File | Lines |
+|------|-------|
+| `components/tutorial/fetch-data-steps.tsx` | L162 |
+| `components/tutorial/fetch-data-steps.tsx` | L20-162 |
+| `components/tutorial/connect-supabase-steps.tsx` | L61 |
+| `README.md` | L44-79 |
+| `package.json` | L42 |
+| `README.md` | L46 |
+| `README.md` | L75-109 |
+| `components/tutorial/fetch-data-steps.tsx` | L30-162 |
+| `lib/supabase/server.ts` | L33 |
+| `app/protected/admin/page.tsx` | L253 |
+| `lib/supabase/client.ts` | L7 |
+| `.specstory/.what-is-this.md` | L29 |
+| `components/sign-up-form.tsx` | L119 |
+| `app/auth/confirm/route.ts` | L29 |
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="list_dir">
+<details>
+            <summary>Tool use: **list_directory** • Listed directory undefined • **0** results</summary>
+        
+No results found
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="glob_file_search">
+<details>
+<summary>Tool use: **glob_file_search** • Searched codebase "*.sql" • **0** result in **1** directory</summary>
+
+Directory: **c:\Users\USER\Desktop\Projects\graduation** (0 file)
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: app/protected/admin/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Creating SQL migrations and storage setup. Setting up the database schema and storage policies:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="write">
+
+<details><summary>Tool use: **code_edit** • Edit file: supabase/migrations/001_create_photos_table.sql</summary>
+
+**Chunk 1**
+Lines added: 72, lines removed: 1
+
+```diff
+@@ -1,1 +1,72 @@
+- 
++ -- Create photos table to track uploaded photos metadata
++ create table if not exists public.photos (
++   id uuid default gen_random_uuid() primary key,
++   file_name text not null,
++   file_path text not null,
++   file_size bigint,
++   mime_type text,
++   width integer,
++   height integer,
++   title text,
++   description text,
++   category text,
++   is_featured boolean default false,
++   is_visible boolean default true,
++   uploaded_by uuid references auth.users(id) on delete set null,
++   created_at timestamp with time zone default timezone(&#39;utc&#39;::text, now()) not null,
++   updated_at timestamp with time zone default timezone(&#39;utc&#39;::text, now()) not null
++ );
++ 
++ -- Create index for faster queries
++ create index if not exists photos_created_at_idx on public.photos(created_at desc);
++ create index if not exists photos_is_visible_idx on public.photos(is_visible);
++ create index if not exists photos_is_featured_idx on public.photos(is_featured);
++ create index if not exists photos_category_idx on public.photos(category);
++ create index if not exists photos_uploaded_by_idx on public.photos(uploaded_by);
++ 
++ -- Enable Row Level Security
++ alter table public.photos enable row level security;
++ 
++ -- Policy: Anyone can view visible photos
++ create policy &quot;Photos are viewable by everyone&quot;
++   on public.photos
++   for select
++   using (is_visible = true);
++ 
++ -- Policy: Only authenticated users can insert photos
++ create policy &quot;Authenticated users can insert photos&quot;
++   on public.photos
++   for insert
++   to authenticated
++   with check (true);
++ 
++ -- Policy: Only authenticated users can update photos
++ create policy &quot;Authenticated users can update photos&quot;
++   on public.photos
++   for update
++   to authenticated
++   using (true)
++   with check (true);
++ 
++ -- Policy: Only authenticated users can delete photos
++ create policy &quot;Authenticated users can delete photos&quot;
++   on public.photos
++   for delete
++   to authenticated
++   using (true);
++ 
++ -- Function to automatically update updated_at timestamp
++ create or replace function public.handle_updated_at()
++ returns trigger as $$
++ begin
++   new.updated_at = timezone(&#39;utc&#39;::text, now());
++   return new;
++ end;
++ $$ language plpgsql;
++ 
++ -- Trigger to update updated_at on photo updates
++ create trigger set_updated_at
++   before update on public.photos
++   for each row
++   execute function public.handle_updated_at();
++ 
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="write">
+
+<details><summary>Tool use: **code_edit** • Edit file: supabase/migrations/002_create_storage_policies.sql</summary>
+
+**Chunk 1**
+Lines added: 44, lines removed: 1
+
+```diff
+@@ -1,1 +1,44 @@
+- 
++ -- Note: This SQL file contains the policies for the storage bucket
++ -- You&#39;ll need to create the &#39;photos&#39; bucket in Supabase Dashboard first:
++ -- 1. Go to Storage in Supabase Dashboard
++ -- 2. Create a new bucket named &#39;photos&#39;
++ -- 3. Set it to Public (or configure RLS as needed)
++ 
++ -- Storage policies are managed through the Supabase Dashboard or via the storage API
++ -- Below are the recommended policies you should set up in the Dashboard:
++ 
++ -- For the &#39;photos&#39; bucket:
++ 
++ -- Policy 1: Allow public read access
++ -- Name: &quot;Public can view photos&quot;
++ -- Type: SELECT
++ -- Target roles: anon, authenticated
++ -- USING expression: bucket_id = &#39;photos&#39;
++ 
++ -- Policy 2: Allow authenticated users to upload
++ -- Name: &quot;Authenticated users can upload photos&quot;
++ -- Type: INSERT
++ -- Target roles: authenticated
++ -- WITH CHECK expression: bucket_id = &#39;photos&#39;
++ 
++ -- Policy 3: Allow authenticated users to update their uploads
++ -- Name: &quot;Authenticated users can update photos&quot;
++ -- Type: UPDATE
++ -- Target roles: authenticated
++ -- USING expression: bucket_id = &#39;photos&#39;
++ -- WITH CHECK expression: bucket_id = &#39;photos&#39;
++ 
++ -- Policy 4: Allow authenticated users to delete
++ -- Name: &quot;Authenticated users can delete photos&quot;
++ -- Type: DELETE
++ -- Target roles: authenticated
++ -- USING expression: bucket_id = &#39;photos&#39;
++ 
++ -- Alternative: If you want to use SQL to create storage policies, you can use:
++ -- Note: Storage policies require special permissions and are typically managed via the dashboard
++ 
++ -- Create storage bucket if it doesn&#39;t exist (run this in SQL Editor if needed)
++ -- insert into storage.buckets (id, name, public)
++ -- values (&#39;photos&#39;, &#39;photos&#39;, true)
++ -- on conflict (id) do nothing;
++ 
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="write">
+
+<details><summary>Tool use: **code_edit** • Edit file: supabase/README.md</summary>
+
+**Chunk 1**
+Lines added: 100, lines removed: 1
+
+```diff
+@@ -1,1 +1,100 @@
+- 
++ # Supabase Setup Instructions
++ 
++ This directory contains SQL migrations for setting up the database schema and storage policies for the Hominid Photography website.
++ 
++ ## Setup Steps
++ 
++ ### 1. Run Database Migrations
++ 
++ 1. Go to your Supabase Dashboard: https://supabase.com/dashboard
++ 2. Navigate to your project
++ 3. Go to **SQL Editor**
++ 4. Run the migrations in order:
++ 
++    - First, run &#96;001_create_photos_table.sql&#96; to create the photos metadata table
++    - Then, review &#96;002_create_storage_policies.sql&#96; for storage policy setup
++ 
++ ### 2. Create Storage Bucket
++ 
++ 1. In Supabase Dashboard, go to **Storage**
++ 2. Click **New bucket**
++ 3. Name it: &#96;photos&#96;
++ 4. Make it **Public** (or configure RLS policies as needed)
++ 5. Click **Create bucket**
++ 
++ ### 3. Set Up Storage Policies
++ 
++ You can set up storage policies in two ways:
++ 
++ #### Option A: Via Dashboard (Recommended)
++ 
++ 1. Go to **Storage** → **Policies** tab
++ 2. Select the &#96;photos&#96; bucket
++ 3. Create the following policies:
++ 
++    **Policy 1: Public Read Access**
++    - Policy name: &quot;Public can view photos&quot;
++    - Allowed operation: SELECT
++    - Target roles: &#96;anon&#96;, &#96;authenticated&#96;
++    - USING expression: &#96;bucket_id = &#39;photos&#39;&#96;
++ 
++    **Policy 2: Authenticated Upload**
++    - Policy name: &quot;Authenticated users can upload&quot;
++    - Allowed operation: INSERT
++    - Target roles: &#96;authenticated&#96;
++    - WITH CHECK expression: &#96;bucket_id = &#39;photos&#39;&#96;
++ 
++    **Policy 3: Authenticated Update**
++    - Policy name: &quot;Authenticated users can update&quot;
++    - Allowed operation: UPDATE
++    - Target roles: &#96;authenticated&#96;
++    - USING expression: &#96;bucket_id = &#39;photos&#39;&#96;
++    - WITH CHECK expression: &#96;bucket_id = &#39;photos&#39;&#96;
++ 
++    **Policy 4: Authenticated Delete**
++    - Policy name: &quot;Authenticated users can delete&quot;
++    - Allowed operation: DELETE
++    - Target roles: &#96;authenticated&#96;
++    - USING expression: &#96;bucket_id = &#39;photos&#39;&#96;
++ 
++ #### Option B: Via SQL (if you have the necessary permissions)
++ 
++ Run the SQL commands in &#96;002_create_storage_policies.sql&#96; in the SQL Editor.
++ 
++ ### 4. Verify Setup
++ 
++ After running the migrations:
++ 
++ 1. Check that the &#96;photos&#96; table exists in **Table Editor**
++ 2. Verify the storage bucket &#96;photos&#96; exists in **Storage**
++ 3. Test uploading a photo through the admin panel at &#96;/protected/admin&#96;
++ 
++ ## Database Schema
++ 
++ ### Photos Table
++ 
++ The &#96;photos&#96; table stores metadata about uploaded photos:
++ 
++ - &#96;id&#96;: UUID primary key
++ - &#96;file_name&#96;: Original filename
++ - &#96;file_path&#96;: Path in storage bucket
++ - &#96;file_size&#96;: File size in bytes
++ - &#96;mime_type&#96;: MIME type (e.g., image/jpeg)
++ - &#96;width&#96;: Image width in pixels
++ - &#96;height&#96;: Image height in pixels
++ - &#96;title&#96;: Optional title for the photo
++ - &#96;description&#96;: Optional description
++ - &#96;category&#96;: Optional category (e.g., &quot;graduation&quot;, &quot;ceremony&quot;)
++ - &#96;is_featured&#96;: Whether photo should be featured
++ - &#96;is_visible&#96;: Whether photo is visible in portfolio
++ - &#96;uploaded_by&#96;: Reference to the user who uploaded it
++ - &#96;created_at&#96;: Timestamp when uploaded
++ - &#96;updated_at&#96;: Timestamp when last updated
++ 
++ ## Security
++ 
++ - Row Level Security (RLS) is enabled on the &#96;photos&#96; table
++ - Public users can only view photos where &#96;is_visible = true&#96;
++ - Only authenticated users can insert, update, or delete photos
++ - Storage policies control access to the actual files
++ 
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="task" data-tool-name="todo_write">
+<details><summary>Tool use: **todo_write** • Todo List</summary>
+
+- [x] Create SQL migrations for photos table
+- [x] Create storage bucket setup documentation
+- [-] Create helper functions for photo management
+- [ ] Update admin page to use database table
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Creating helper functions for photo management:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="write">
+
+<details><summary>Tool use: **code_edit** • Edit file: lib/photos.ts</summary>
+
+**Chunk 1**
+Lines added: 290, lines removed: 1
+
+```diff
+@@ -1,1 +1,290 @@
+- 
++ import { createClient } from &quot;@/lib/supabase/server&quot;;
++ 
++ export interface PhotoMetadata {
++   id?: string;
++   file_name: string;
++   file_path: string;
++   file_size?: number;
++   mime_type?: string;
++   width?: number;
++   height?: number;
++   title?: string;
++   description?: string;
++   category?: string;
++   is_featured?: boolean;
++   is_visible?: boolean;
++   uploaded_by?: string;
++   created_at?: string;
++   updated_at?: string;
++ }
++ 
++ export interface PhotoWithUrl extends PhotoMetadata {
++   url: string;
++ }
++ 
++ /**
++  * Get all visible photos from the database
++  */
++ export async function getVisiblePhotos(): Promise&lt;PhotoWithUrl[]&gt; {
++   const supabase = await createClient();
++ 
++   const { data: photos, error } = await supabase
++     .from(&quot;photos&quot;)
++     .select(&quot;*&quot;)
++     .eq(&quot;is_visible&quot;, true)
++     .order(&quot;created_at&quot;, { ascending: false });
++ 
++   if (error) {
++     console.error(&quot;Error fetching photos:&quot;, error);
++     throw error;
++   }
++ 
++   // Get public URLs for each photo
++   const photosWithUrls: PhotoWithUrl[] = (photos || []).map((photo) =&gt; {
++     const { data } = supabase.storage
++       .from(&quot;photos&quot;)
++       .getPublicUrl(photo.file_path);
++ 
++     return {
++       ...photo,
++       url: data.publicUrl,
++     };
++   });
++ 
++   return photosWithUrls;
++ }
++ 
++ /**
++  * Get all photos (including hidden ones) - for admin use
++  */
++ export async function getAllPhotos(): Promise&lt;PhotoWithUrl[]&gt; {
++   const supabase = await createClient();
++ 
++   const { data: photos, error } = await supabase
++     .from(&quot;photos&quot;)
++     .select(&quot;*&quot;)
++     .order(&quot;created_at&quot;, { ascending: false });
++ 
++   if (error) {
++     console.error(&quot;Error fetching all photos:&quot;, error);
++     throw error;
++   }
++ 
++   // Get public URLs for each photo
++   const photosWithUrls: PhotoWithUrl[] = (photos || []).map((photo) =&gt; {
++     const { data } = supabase.storage
++       .from(&quot;photos&quot;)
++       .getPublicUrl(photo.file_path);
++ 
++     return {
++       ...photo,
++       url: data.publicUrl,
++     };
++   });
++ 
++   return photosWithUrls;
++ }
++ 
++ /**
++  * Get a single photo by ID
++  */
++ export async function getPhotoById(id: string): Promise&lt;PhotoWithUrl | null&gt; {
++   const supabase = await createClient();
++ 
++   const { data: photo, error } = await supabase
++     .from(&quot;photos&quot;)
++     .select(&quot;*&quot;)
++     .eq(&quot;id&quot;, id)
++     .single();
++ 
++   if (error) {
++     console.error(&quot;Error fetching photo:&quot;, error);
++     return null;
++   }
++ 
++   const { data } = supabase.storage
++     .from(&quot;photos&quot;)
++     .getPublicUrl(photo.file_path);
++ 
++   return {
++     ...photo,
++     url: data.publicUrl,
++   };
++ }
++ 
++ /**
++  * Upload a photo to storage and create a database record
++  */
++ export async function uploadPhoto(
++   file: File,
++   metadata?: {
++     title?: string;
++     description?: string;
++     category?: string;
++     is_featured?: boolean;
++     is_visible?: boolean;
++   }
++ ): Promise&lt;PhotoMetadata&gt; {
++   const supabase = await createClient();
++ 
++   // Get current user
++   const {
++     data: { user },
++   } = await supabase.auth.getUser();
++ 
++   if (!user) {
++     throw new Error(&quot;User must be authenticated to upload photos&quot;);
++   }
++ 
++   // Generate unique filename
++   const fileExt = file.name.split(&quot;.&quot;).pop();
++   const fileName = &#96;${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}&#96;;
++   const filePath = fileName;
++ 
++   // Upload file to storage
++   const { error: uploadError } = await supabase.storage
++     .from(&quot;photos&quot;)
++     .upload(filePath, file, {
++       cacheControl: &quot;3600&quot;,
++       upsert: false,
++     });
++ 
++   if (uploadError) {
++     console.error(&quot;Error uploading file:&quot;, uploadError);
++     throw uploadError;
++   }
++ 
++   // Get image dimensions if it&#39;s an image
++   let width: number | undefined;
++   let height: number | undefined;
++ 
++   if (file.type.startsWith(&quot;image/&quot;)) {
++     try {
++       const dimensions = await getImageDimensions(file);
++       width = dimensions.width;
++       height = dimensions.height;
++     } catch (error) {
++       console.warn(&quot;Could not get image dimensions:&quot;, error);
++     }
++   }
++ 
++   // Create database record
++   const photoData: Partial&lt;PhotoMetadata&gt; = {
++     file_name: file.name,
++     file_path: filePath,
++     file_size: file.size,
++     mime_type: file.type,
++     width,
++     height,
++     title: metadata?.title,
++     description: metadata?.description,
++     category: metadata?.category,
++     is_featured: metadata?.is_featured ?? false,
++     is_visible: metadata?.is_visible ?? true,
++     uploaded_by: user.id,
++   };
++ 
++   const { data: photo, error: dbError } = await supabase
++     .from(&quot;photos&quot;)
++     .insert(photoData)
++     .select()
++     .single();
++ 
++   if (dbError) {
++     // If database insert fails, try to clean up the uploaded file
++     await supabase.storage.from(&quot;photos&quot;).remove([filePath]);
++     console.error(&quot;Error creating photo record:&quot;, dbError);
++     throw dbError;
++   }
++ 
++   return photo;
++ }
++ 
++ /**
++  * Delete a photo from both storage and database
++  */
++ export async function deletePhoto(id: string): Promise&lt;void&gt; {
++   const supabase = await createClient();
++ 
++   // Get photo record first to get file path
++   const { data: photo, error: fetchError } = await supabase
++     .from(&quot;photos&quot;)
++     .select(&quot;file_path&quot;)
++     .eq(&quot;id&quot;, id)
++     .single();
++ 
++   if (fetchError || !photo) {
++     throw new Error(&quot;Photo not found&quot;);
++   }
++ 
++   // Delete from storage
++   const { error: storageError } = await supabase.storage
++     .from(&quot;photos&quot;)
++     .remove([photo.file_path]);
++ 
++   if (storageError) {
++     console.error(&quot;Error deleting file from storage:&quot;, storageError);
++     // Continue to delete from database even if storage delete fails
++   }
++ 
++   // Delete from database
++   const { error: dbError } = await supabase.from(&quot;photos&quot;).delete().eq(&quot;id&quot;, id);
++ 
++   if (dbError) {
++     console.error(&quot;Error deleting photo record:&quot;, dbError);
++     throw dbError;
++   }
++ }
++ 
++ /**
++  * Update photo metadata
++  */
++ export async function updatePhoto(
++   id: string,
++   updates: {
++     title?: string;
++     description?: string;
++     category?: string;
++     is_featured?: boolean;
++     is_visible?: boolean;
++   }
++ ): Promise&lt;PhotoMetadata&gt; {
++   const supabase = await createClient();
++ 
++   const { data: photo, error } = await supabase
++     .from(&quot;photos&quot;)
++     .update(updates)
++     .eq(&quot;id&quot;, id)
++     .select()
++     .single();
++ 
++   if (error) {
++     console.error(&quot;Error updating photo:&quot;, error);
++     throw error;
++   }
++ 
++   return photo;
++ }
++ 
++ /**
++  * Get image dimensions from a file
++  */
++ function getImageDimensions(file: File): Promise&lt;{ width: number; height: number }&gt; {
++   return new Promise((resolve, reject) =&gt; {
++     const img = new Image();
++     const url = URL.createObjectURL(file);
++ 
++     img.onload = () =&gt; {
++       URL.revokeObjectURL(url);
++       resolve({ width: img.width, height: img.height });
++     };
++ 
++     img.onerror = () =&gt; {
++       URL.revokeObjectURL(url);
++       reject(new Error(&quot;Failed to load image&quot;));
++     };
++ 
++     img.src = url;
++   });
++ }
++ 
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="write">
+
+<details><summary>Tool use: **code_edit** • Edit file: lib/photos-client.ts</summary>
+
+**Chunk 1**
+Lines added: 248, lines removed: 1
+
+```diff
+@@ -1,1 +1,248 @@
+- 
++ &quot;use client&quot;;
++ 
++ import { createClient } from &quot;@/lib/supabase/client&quot;;
++ import type { PhotoMetadata, PhotoWithUrl } from &quot;@/lib/photos&quot;;
++ 
++ /**
++  * Client-side functions for photo management
++  * These use the browser client and can be called from client components
++  */
++ 
++ /**
++  * Get all visible photos from the database (client-side)
++  */
++ export async function getVisiblePhotosClient(): Promise&lt;PhotoWithUrl[]&gt; {
++   const supabase = createClient();
++ 
++   const { data: photos, error } = await supabase
++     .from(&quot;photos&quot;)
++     .select(&quot;*&quot;)
++     .eq(&quot;is_visible&quot;, true)
++     .order(&quot;created_at&quot;, { ascending: false });
++ 
++   if (error) {
++     console.error(&quot;Error fetching photos:&quot;, error);
++     throw error;
++   }
++ 
++   // Get public URLs for each photo
++   const photosWithUrls: PhotoWithUrl[] = (photos || []).map((photo) =&gt; {
++     const { data } = supabase.storage
++       .from(&quot;photos&quot;)
++       .getPublicUrl(photo.file_path);
++ 
++     return {
++       ...photo,
++       url: data.publicUrl,
++     };
++   });
++ 
++   return photosWithUrls;
++ }
++ 
++ /**
++  * Get all photos (including hidden ones) - for admin use (client-side)
++  */
++ export async function getAllPhotosClient(): Promise&lt;PhotoWithUrl[]&gt; {
++   const supabase = createClient();
++ 
++   const { data: photos, error } = await supabase
++     .from(&quot;photos&quot;)
++     .select(&quot;*&quot;)
++     .order(&quot;created_at&quot;, { ascending: false });
++ 
++   if (error) {
++     console.error(&quot;Error fetching all photos:&quot;, error);
++     throw error;
++   }
++ 
++   // Get public URLs for each photo
++   const photosWithUrls: PhotoWithUrl[] = (photos || []).map((photo) =&gt; {
++     const { data } = supabase.storage
++       .from(&quot;photos&quot;)
++       .getPublicUrl(photo.file_path);
++ 
++     return {
++       ...photo,
++       url: data.publicUrl,
++     };
++   });
++ 
++   return photosWithUrls;
++ }
++ 
++ /**
++  * Upload a photo to storage and create a database record (client-side)
++  */
++ export async function uploadPhotoClient(
++   file: File,
++   metadata?: {
++     title?: string;
++     description?: string;
++     category?: string;
++     is_featured?: boolean;
++     is_visible?: boolean;
++   }
++ ): Promise&lt;PhotoMetadata&gt; {
++   const supabase = createClient();
++ 
++   // Get current user
++   const {
++     data: { user },
++   } = await supabase.auth.getUser();
++ 
++   if (!user) {
++     throw new Error(&quot;User must be authenticated to upload photos&quot;);
++   }
++ 
++   // Generate unique filename
++   const fileExt = file.name.split(&quot;.&quot;).pop();
++   const fileName = &#96;${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}&#96;;
++   const filePath = fileName;
++ 
++   // Upload file to storage
++   const { error: uploadError } = await supabase.storage
++     .from(&quot;photos&quot;)
++     .upload(filePath, file, {
++       cacheControl: &quot;3600&quot;,
++       upsert: false,
++     });
++ 
++   if (uploadError) {
++     console.error(&quot;Error uploading file:&quot;, uploadError);
++     throw uploadError;
++   }
++ 
++   // Get image dimensions if it&#39;s an image
++   let width: number | undefined;
++   let height: number | undefined;
++ 
++   if (file.type.startsWith(&quot;image/&quot;)) {
++     try {
++       const dimensions = await getImageDimensions(file);
++       width = dimensions.width;
++       height = dimensions.height;
++     } catch (error) {
++       console.warn(&quot;Could not get image dimensions:&quot;, error);
++     }
++   }
++ 
++   // Create database record
++   const photoData: Partial&lt;PhotoMetadata&gt; = {
++     file_name: file.name,
++     file_path: filePath,
++     file_size: file.size,
++     mime_type: file.type,
++     width,
++     height,
++     title: metadata?.title,
++     description: metadata?.description,
++     category: metadata?.category,
++     is_featured: metadata?.is_featured ?? false,
++     is_visible: metadata?.is_visible ?? true,
++     uploaded_by: user.id,
++   };
++ 
++   const { data: photo, error: dbError } = await supabase
++     .from(&quot;photos&quot;)
++     .insert(photoData)
++     .select()
++     .single();
++ 
++   if (dbError) {
++     // If database insert fails, try to clean up the uploaded file
++     await supabase.storage.from(&quot;photos&quot;).remove([filePath]);
++     console.error(&quot;Error creating photo record:&quot;, dbError);
++     throw dbError;
++   }
++ 
++   return photo;
++ }
++ 
++ /**
++  * Delete a photo from both storage and database (client-side)
++  */
++ export async function deletePhotoClient(id: string): Promise&lt;void&gt; {
++   const supabase = createClient();
++ 
++   // Get photo record first to get file path
++   const { data: photo, error: fetchError } = await supabase
++     .from(&quot;photos&quot;)
++     .select(&quot;file_path&quot;)
++     .eq(&quot;id&quot;, id)
++     .single();
++ 
++   if (fetchError || !photo) {
++     throw new Error(&quot;Photo not found&quot;);
++   }
++ 
++   // Delete from storage
++   const { error: storageError } = await supabase.storage
++     .from(&quot;photos&quot;)
++     .remove([photo.file_path]);
++ 
++   if (storageError) {
++     console.error(&quot;Error deleting file from storage:&quot;, storageError);
++     // Continue to delete from database even if storage delete fails
++   }
++ 
++   // Delete from database
++   const { error: dbError } = await supabase.from(&quot;photos&quot;).delete().eq(&quot;id&quot;, id);
++ 
++   if (dbError) {
++     console.error(&quot;Error deleting photo record:&quot;, dbError);
++     throw dbError;
++   }
++ }
++ 
++ /**
++  * Update photo metadata (client-side)
++  */
++ export async function updatePhotoClient(
++   id: string,
++   updates: {
++     title?: string;
++     description?: string;
++     category?: string;
++     is_featured?: boolean;
++     is_visible?: boolean;
++   }
++ ): Promise&lt;PhotoMetadata&gt; {
++   const supabase = createClient();
++ 
++   const { data: photo, error } = await supabase
++     .from(&quot;photos&quot;)
++     .update(updates)
++     .select()
++     .single();
++ 
++   if (error) {
++     console.error(&quot;Error updating photo:&quot;, error);
++     throw error;
++   }
++ 
++   return photo;
++ }
++ 
++ /**
++  * Get image dimensions from a file
++  */
++ function getImageDimensions(file: File): Promise&lt;{ width: number; height: number }&gt; {
++   return new Promise((resolve, reject) =&gt; {
++     const img = new Image();
++     const url = URL.createObjectURL(file);
++ 
++     img.onload = () =&gt; {
++       URL.revokeObjectURL(url);
++       resolve({ width: img.width, height: img.height });
++     };
++ 
++     img.onerror = () =&gt; {
++       URL.revokeObjectURL(url);
++       reject(new Error(&quot;Failed to load image&quot;));
++     };
++ 
++     img.src = url;
++   });
++ }
++ 
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="task" data-tool-name="todo_write">
+<details><summary>Tool use: **todo_write** • Todo List</summary>
+
+- [x] Create SQL migrations for photos table
+- [x] Create storage bucket setup documentation
+- [x] Create helper functions for photo management
+- [-] Update admin page to use database table
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Updating the admin page to use the database table and helper functions:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **code_edit** • Edit file: app/protected/admin/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -6,4 +6,5 @@
+  import { Card, CardContent, CardDescription, CardHeader, CardTitle } from &quot;@/components/ui/card&quot;;
+  import { Input } from &quot;@/components/ui/input&quot;;
++ import { Label } from &quot;@/components/ui/label&quot;;
+  import {
+    Dialog,
+```
+
+**Chunk 2**
+Lines added: 16, lines removed: 2
+
+```diff
+@@ -14,14 +15,28 @@
+    DialogTrigger,
+  } from &quot;@/components/ui/dialog&quot;;
+- import { Upload, Trash2, Image as ImageIcon, Loader2 } from &quot;lucide-react&quot;;
++ import { Upload, Trash2, Loader2, Eye, EyeOff, Star } from &quot;lucide-react&quot;;
+  import Image from &quot;next/image&quot;;
+  import { useRouter } from &quot;next/navigation&quot;;
++ import { getAllPhotosClient, uploadPhotoClient, deletePhotoClient, updatePhotoClient } from &quot;@/lib/photos-client&quot;;
++ import type { PhotoWithUrl } from &quot;@/lib/photos&quot;;
++ import {
++   AlertDialog,
++   AlertDialogAction,
++   AlertDialogCancel,
++   AlertDialogContent,
++   AlertDialogDescription,
++   AlertDialogFooter,
++   AlertDialogHeader,
++   AlertDialogTitle,
++ } from &quot;@/components/ui/alert-dialog&quot;;
+  
+  export default function AdminPage() {
+-   const [photos, setPhotos] = useState&lt;any[]&gt;([]);
++   const [photos, setPhotos] = useState&lt;PhotoWithUrl[]&gt;([]);
+    const [loading, setLoading] = useState(true);
+    const [uploading, setUploading] = useState(false);
+    const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+    const [selectedFiles, setSelectedFiles] = useState&lt;File[]&gt;([]);
++   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
++   const [photoToDelete, setPhotoToDelete] = useState&lt;PhotoWithUrl | null&gt;(null);
+    const router = useRouter();
+    const supabase = createClient();
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **code_edit** • Edit file: app/protected/admin/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: 13
+
+```diff
+@@ -57,17 +57,6 @@
+      try {
+        setLoading(true);
+-       const { data: files, error } = await supabase.storage
+-         .from(&quot;photos&quot;)
+-         .list(&quot;&quot;, {
+-           limit: 100,
+-           offset: 0,
+-           sortBy: { column: &quot;created_at&quot;, order: &quot;desc&quot; },
+-         });
+- 
+-       if (error) throw error;
+- 
+-       const photoFiles =
+-         files?.filter((file) =&gt; file.name !== &quot;.emptyFolderPlaceholder&quot;) || [];
+-       setPhotos(photoFiles);
++       const allPhotos = await getAllPhotosClient();
++       setPhotos(allPhotos);
+      } catch (error) {
+        console.error(&quot;Error loading photos:&quot;, error);
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **code_edit** • Edit file: app/protected/admin/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 3, lines removed: 15
+
+```diff
+@@ -79,19 +79,7 @@
+  
+        for (const file of selectedFiles) {
+-         const fileExt = file.name.split(&quot;.&quot;).pop();
+-         const fileName = &#96;${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}&#96;;
+-         const filePath = fileName;
+- 
+-         const { error: uploadError } = await supabase.storage
+-           .from(&quot;photos&quot;)
+-           .upload(filePath, file, {
+-             cacheControl: &quot;3600&quot;,
+-             upsert: false,
+-           });
+- 
+-         if (uploadError) {
+-           console.error(&quot;Error uploading file:&quot;, uploadError);
+-           throw uploadError;
+-         }
++         await uploadPhotoClient(file, {
++           is_visible: true,
++         });
+        }
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **code_edit** • Edit file: app/protected/admin/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 12, lines removed: 12
+
+```diff
+@@ -95,16 +95,16 @@
+    };
+  
+-   const handleDelete = async (fileName: string) =&gt; {
+-     if (!confirm(&#96;Are you sure you want to delete ${fileName}?&#96;)) {
+-       return;
+-     }
+- 
+-     try {
+-       const { error } = await supabase.storage
+-         .from(&quot;photos&quot;)
+-         .remove([fileName]);
+- 
+-       if (error) throw error;
+- 
++   const handleDeleteClick = (photo: PhotoWithUrl) =&gt; {
++     setPhotoToDelete(photo);
++     setDeleteDialogOpen(true);
++   };
++ 
++   const handleDelete = async () =&gt; {
++     if (!photoToDelete?.id) return;
++ 
++     try {
++       await deletePhotoClient(photoToDelete.id);
++       setDeleteDialogOpen(false);
++       setPhotoToDelete(null);
+        await loadPhotos();
+      } catch (error) {
+```
+
+**Chunk 2**
+Lines added: 26, lines removed: 3
+
+```diff
+@@ -114,7 +114,30 @@
+    };
+  
+-   const getImageUrl = (fileName: string) =&gt; {
+-     const { data } = supabase.storage.from(&quot;photos&quot;).getPublicUrl(fileName);
+-     return data.publicUrl;
++   const toggleVisibility = async (photo: PhotoWithUrl) =&gt; {
++     if (!photo.id) return;
++ 
++     try {
++       await updatePhotoClient(photo.id, {
++         is_visible: !photo.is_visible,
++       });
++       await loadPhotos();
++     } catch (error) {
++       console.error(&quot;Error updating photo:&quot;, error);
++       alert(&quot;Failed to update photo. Please try again.&quot;);
++     }
++   };
++ 
++   const toggleFeatured = async (photo: PhotoWithUrl) =&gt; {
++     if (!photo.id) return;
++ 
++     try {
++       await updatePhotoClient(photo.id, {
++         is_featured: !photo.is_featured,
++       });
++       await loadPhotos();
++     } catch (error) {
++       console.error(&quot;Error updating photo:&quot;, error);
++       alert(&quot;Failed to update photo. Please try again.&quot;);
++     }
+    };
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **code_edit** • Edit file: app/protected/admin/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 115, lines removed: 27
+
+```diff
+@@ -228,40 +228,128 @@
+          ) : (
+            &lt;div className=&quot;grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4&quot;&gt;
+-             {photos.map((photo) =&gt; {
+-               const imageUrl = getImageUrl(photo.name);
+-               return (
+-                 &lt;Card key={photo.name} className=&quot;overflow-hidden&quot;&gt;
+-                   &lt;div className=&quot;relative aspect-square w-full overflow-hidden bg-muted&quot;&gt;
+-                     &lt;Image
+-                       src={imageUrl}
+-                       alt={photo.name}
+-                       fill
+-                       className=&quot;object-cover&quot;
+-                       sizes=&quot;(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw&quot;
+-                     /&gt;
+-                   &lt;/div&gt;
+-                   &lt;CardContent className=&quot;p-4&quot;&gt;
+-                     &lt;div className=&quot;flex items-center justify-between&quot;&gt;
+-                       &lt;p className=&quot;text-sm font-medium truncate flex-1 mr-2&quot;&gt;
+-                         {photo.name}
+-                       &lt;/p&gt;
++             {photos.map((photo) =&gt; (
++               &lt;Card key={photo.id} className=&quot;overflow-hidden&quot;&gt;
++                 &lt;div className=&quot;relative aspect-square w-full overflow-hidden bg-muted group&quot;&gt;
++                   &lt;Image
++                     src={photo.url}
++                     alt={photo.title || photo.file_name}
++                     fill
++                     className=&quot;object-cover&quot;
++                     sizes=&quot;(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw&quot;
++                   /&gt;
++                   {photo.is_featured &amp;&amp; (
++                     &lt;div className=&quot;absolute top-2 left-2&quot;&gt;
++                       &lt;div className=&quot;bg-yellow-500 text-white px-2 py-1 rounded text-xs font-semibold flex items-center gap-1&quot;&gt;
++                         &lt;Star className=&quot;h-3 w-3 fill-current&quot; /&gt;
++                         Featured
++                       &lt;/div&gt;
++                     &lt;/div&gt;
++                   )}
++                   {!photo.is_visible &amp;&amp; (
++                     &lt;div className=&quot;absolute top-2 right-2&quot;&gt;
++                       &lt;div className=&quot;bg-gray-600 text-white px-2 py-1 rounded text-xs font-semibold&quot;&gt;
++                         Hidden
++                       &lt;/div&gt;
++                     &lt;/div&gt;
++                   )}
++                 &lt;/div&gt;
++                 &lt;CardContent className=&quot;p-4&quot;&gt;
++                   &lt;div className=&quot;space-y-2&quot;&gt;
++                     &lt;div&gt;
++                       &lt;p className=&quot;text-sm font-medium truncate&quot;&gt;
++                         {photo.title || photo.file_name}
++                       &lt;/p&gt;
++                       {photo.title &amp;&amp; (
++                         &lt;p className=&quot;text-xs text-muted-foreground truncate&quot;&gt;
++                           {photo.file_name}
++                         &lt;/p&gt;
++                       )}
++                     &lt;/div&gt;
++                     &lt;div className=&quot;flex items-center justify-between gap-2&quot;&gt;
++                       &lt;div className=&quot;flex gap-1&quot;&gt;
++                         &lt;Button
++                           variant=&quot;ghost&quot;
++                           size=&quot;icon&quot;
++                           onClick={() =&gt; toggleVisibility(photo)}
++                           className=&quot;h-8 w-8&quot;
++                           title={photo.is_visible ? &quot;Hide photo&quot; : &quot;Show photo&quot;}
++                         &gt;
++                           {photo.is_visible ? (
++                             &lt;Eye className=&quot;h-4 w-4&quot; /&gt;
++                           ) : (
++                             &lt;EyeOff className=&quot;h-4 w-4&quot; /&gt;
++                           )}
++                         &lt;/Button&gt;
++                         &lt;Button
++                           variant=&quot;ghost&quot;
++                           size=&quot;icon&quot;
++                           onClick={() =&gt; toggleFeatured(photo)}
++                           className={&#96;h-8 w-8 ${
++                             photo.is_featured
++                               ? &quot;text-yellow-500 hover:text-yellow-600&quot;
++                               : &quot;&quot;
++                           }&#96;}
++                           title={
++                             photo.is_featured
++                               ? &quot;Remove from featured&quot;
++                               : &quot;Mark as featured&quot;
++                           }
++                         &gt;
++                           &lt;Star
++                             className={&#96;h-4 w-4 ${
++                               photo.is_featured ? &quot;fill-current&quot; : &quot;&quot;
++                             }&#96;}
++                           /&gt;
++                         &lt;/Button&gt;
++                       &lt;/div&gt;
+                        &lt;Button
+                          variant=&quot;ghost&quot;
+                          size=&quot;icon&quot;
+-                         onClick={() =&gt; handleDelete(photo.name)}
+-                         className=&quot;text-destructive hover:text-destructive&quot;
++                         onClick={() =&gt; handleDeleteClick(photo)}
++                         className=&quot;text-destructive hover:text-destructive h-8 w-8&quot;
++                         title=&quot;Delete photo&quot;
+                        &gt;
+                          &lt;Trash2 className=&quot;h-4 w-4&quot; /&gt;
+                        &lt;/Button&gt;
+                      &lt;/div&gt;
+-                     &lt;p className=&quot;text-xs text-muted-foreground mt-1&quot;&gt;
+-                       {new Date(photo.created_at).toLocaleDateString()}
+-                     &lt;/p&gt;
+-                   &lt;/CardContent&gt;
+-                 &lt;/Card&gt;
+-               );
+-             })}
++                     &lt;div className=&quot;text-xs text-muted-foreground space-y-1&quot;&gt;
++                       {photo.width &amp;&amp; photo.height &amp;&amp; (
++                         &lt;p&gt;
++                           {photo.width} × {photo.height}px
++                         &lt;/p&gt;
++                       )}
++                       &lt;p&gt;
++                         {photo.created_at &amp;&amp;
++                           new Date(photo.created_at).toLocaleDateString()}
++                       &lt;/p&gt;
++                     &lt;/div&gt;
++                   &lt;/div&gt;
++                 &lt;/CardContent&gt;
++               &lt;/Card&gt;
++             ))}
+            &lt;/div&gt;
+          )}
++ 
++         &lt;AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}&gt;
++           &lt;AlertDialogContent&gt;
++             &lt;AlertDialogHeader&gt;
++               &lt;AlertDialogTitle&gt;Are you sure?&lt;/AlertDialogTitle&gt;
++               &lt;AlertDialogDescription&gt;
++                 This will permanently delete the photo &amp;quot;
++                 {photoToDelete?.title || photoToDelete?.file_name}&amp;quot;. This
++                 action cannot be undone.
++               &lt;/AlertDialogDescription&gt;
++             &lt;/AlertDialogHeader&gt;
++             &lt;AlertDialogFooter&gt;
++               &lt;AlertDialogCancel&gt;Cancel&lt;/AlertDialogCancel&gt;
++               &lt;AlertDialogAction
++                 onClick={handleDelete}
++                 className=&quot;bg-destructive text-destructive-foreground hover:bg-destructive/90&quot;
++               &gt;
++                 Delete
++               &lt;/AlertDialogAction&gt;
++             &lt;/AlertDialogFooter&gt;
++           &lt;/AlertDialogContent&gt;
++         &lt;/AlertDialog&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 3 files</summary>
+      
+Lint paths:
+
+- `app/protected/admin/page.tsx`
+- `lib/photos.ts`
+- `lib/photos-client.ts`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Updating the portfolio page to use the database table:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: app/portfolio/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **code_edit** • Edit file: app/portfolio/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 22, lines removed: 47
+
+```diff
+@@ -2,59 +2,34 @@
+  import { Footer } from &quot;@/components/footer&quot;;
+  import { Card, CardContent } from &quot;@/components/ui/card&quot;;
+- import { createClient } from &quot;@/lib/supabase/server&quot;;
++ import { getVisiblePhotos } from &quot;@/lib/photos&quot;;
+  import Image from &quot;next/image&quot;;
+  import { Suspense } from &quot;react&quot;;
+  
+  async function PhotoGallery() {
+-   const supabase = await createClient();
+-   
+-   // List files from Supabase storage
+-   // Note: You&#39;ll need to create a &#39;photos&#39; bucket in Supabase Storage
+-   const { data: files, error } = await supabase.storage
+-     .from(&quot;photos&quot;)
+-     .list(&quot;&quot;, {
+-       limit: 100,
+-       offset: 0,
+-       sortBy: { column: &quot;created_at&quot;, order: &quot;desc&quot; },
+-     });
+- 
+-   if (error) {
+-     console.error(&quot;Error fetching photos:&quot;, error);
+-     return (
+-       &lt;div className=&quot;text-center py-12&quot;&gt;
+-         &lt;p className=&quot;text-muted-foreground&quot;&gt;
+-           Unable to load photos. Please check storage configuration.
+-         &lt;/p&gt;
+-       &lt;/div&gt;
+-     );
+-   }
+- 
+-   if (!files || files.length === 0) {
+-     return (
+-       &lt;div className=&quot;text-center py-12&quot;&gt;
+-         &lt;p className=&quot;text-muted-foreground&quot;&gt;
+-           No photos available yet. Check back soon!
+-         &lt;/p&gt;
+-       &lt;/div&gt;
+-     );
+-   }
+- 
+-   // Filter out folders and get public URLs
+-   const photoFiles = files.filter((file) =&gt; file.name !== &quot;.emptyFolderPlaceholder&quot;);
++   try {
++     const photos = await getVisiblePhotos();
++ 
++     if (!photos || photos.length === 0) {
++       return (
++         &lt;div className=&quot;text-center py-12&quot;&gt;
++           &lt;p className=&quot;text-muted-foreground&quot;&gt;
++             No photos available yet. Check back soon!
++           &lt;/p&gt;
++         &lt;/div&gt;
++       );
++     }
+  
+-   return (
+-     &lt;div className=&quot;grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4&quot;&gt;
+-       {photoFiles.map((file) =&gt; {
+-         const { data: { publicUrl: imageUrl } } = supabase.storage
+-           .from(&quot;photos&quot;)
+-           .getPublicUrl(file.name);
+-         
+-         return (
+-           &lt;Card key={file.name} className=&quot;overflow-hidden group cursor-pointer hover:shadow-lg transition-shadow&quot;&gt;
++     return (
++       &lt;div className=&quot;grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4&quot;&gt;
++         {photos.map((photo) =&gt; (
++           &lt;Card
++             key={photo.id}
++             className=&quot;overflow-hidden group cursor-pointer hover:shadow-lg transition-shadow&quot;
++           &gt;
+              &lt;CardContent className=&quot;p-0&quot;&gt;
+                &lt;div className=&quot;relative aspect-square w-full overflow-hidden&quot;&gt;
+                  &lt;Image
+-                   src={imageUrl}
+-                   alt={file.name}
++                   src={photo.url}
++                   alt={photo.title || photo.file_name}
+                    fill
+                    className=&quot;object-cover group-hover:scale-105 transition-transform duration-300&quot;
+```
+
+**Chunk 2**
+Lines added: 13, lines removed: 4
+
+```diff
+@@ -64,8 +39,17 @@
+              &lt;/CardContent&gt;
+            &lt;/Card&gt;
+-         );
+-       })}
+-     &lt;/div&gt;
+-   );
++         ))}
++       &lt;/div&gt;
++     );
++   } catch (error) {
++     console.error(&quot;Error fetching photos:&quot;, error);
++     return (
++       &lt;div className=&quot;text-center py-12&quot;&gt;
++         &lt;p className=&quot;text-muted-foreground&quot;&gt;
++           Unable to load photos. Please check database configuration.
++         &lt;/p&gt;
++       &lt;/div&gt;
++     );
++   }
+  }
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="task" data-tool-name="todo_write">
+<details><summary>Tool use: **todo_write** • Todo List</summary>
+
+- [x] Create SQL migrations for photos table
+- [x] Create storage bucket setup documentation
+- [x] Create helper functions for photo management
+- [x] Update admin page to use database table
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Checking for linting errors and fixing any issues:
+
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 2 files</summary>
+      
+Lint paths:
+
+- `app/portfolio/page.tsx`
+- `lib/photos-client.ts`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: lib/photos-client.ts</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+## Completed setup
+
+### 1. Database schema
+- Created `supabase/migrations/001_create_photos_table.sql`:
+  - Photos table with metadata fields (title, description, category, visibility, featured status)
+  - Indexes for performance
+  - Row Level Security (RLS) policies
+  - Auto-update trigger for `updated_at`
+
+### 2. Storage setup
+- Created `supabase/migrations/002_create_storage_policies.sql` with policy documentation
+- Created `supabase/README.md` with setup instructions
+
+### 3. Helper functions
+- `lib/photos.ts` — Server-side functions for photo management
+- `lib/photos-client.ts` — Client-side functions for admin page
+- Features:
+  - Upload photos with metadata
+  - Get visible/all photos
+  - Delete photos (storage + database)
+  - Update photo metadata
+  - Automatic image dimension detection
+
+### 4. Admin page updates
+- Uses database table instead of direct storage listing
+- Features:
+  - Upload multiple photos
+  - View all photos with metadata
+  - Toggle visibility (show/hide in portfolio)
+  - Toggle featured status
+  - Delete photos with confirmation dialog
+  - Display image dimensions and upload date
+
+### 5. Portfolio page updates
+- Now uses database table to show only visible photos
+- Better error handling
+
+## Next steps — Supabase setup
+
+1. Run database migration:
+   - Go to Supabase Dashboard → SQL Editor
+   - Run `supabase/migrations/001_create_photos_table.sql`
+
+2. Create storage bucket:
+   - Go to Storage in Supabase Dashboard
+   - Create a bucket named `photos`
+   - Set it to Public
+
+3. Set up storage policies:
+   - Follow instructions in `supabase/README.md`
+   - Or use the Dashboard to create policies for public read and authenticated upload/delete
+
+4. Test the admin page:
+   - Log in at `/auth/login`
+   - Go to `/protected/admin`
+   - Upload a test photo
+
+The admin page now supports:
+- Uploading photos with automatic metadata creation
+- Managing photo visibility
+- Marking photos as featured
+- Deleting photos with confirmation
+- Viewing all photos with their metadata
+
+All photos are tracked in the database with metadata, making it easier to manage and organize your portfolio.
+
+---
+
+_**User (2025-11-25 07:07Z)**_
+
+Could you generate sql to do this once?@supabase/migrations/002_create_storage_policies.sql 
+
+---
+
+_**Agent (model default, mode Agent)**_
+
+
+
+---
+
+
+Generating executable SQL to create the storage bucket and policies:
+
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="search_replace">
+<details>
+<summary>Tool use: **search_replace**</summary>
+
+
+Parameters:
+
+```json
+{
+  &quot;relativeWorkspacePath&quot;: &quot;supabase/migrations/002_create_storage_policies.sql&quot;
+}
+```
+Additional data:
+
+```json
+{
+  &quot;codeblockId&quot;: &quot;2f591bc3-9864-43ba-a90a-279b369d1ee5&quot;
+}
+```
+User decision: **accepted**
+
+Status: **loading**
+
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
