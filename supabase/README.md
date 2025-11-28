@@ -18,7 +18,7 @@ This directory contains SQL migrations for setting up the database schema and st
 
 1. In Supabase Dashboard, go to **Storage**
 2. Click **New bucket**
-3. Name it: `photos`
+3. Name it: `portfolio`
 4. Make it **Public** (or configure RLS policies as needed)
 5. Click **Create bucket**
 
@@ -29,33 +29,33 @@ You can set up storage policies in two ways:
 #### Option A: Via Dashboard (Recommended)
 
 1. Go to **Storage** → **Policies** tab
-2. Select the `photos` bucket
+2. Select the `portfolio` bucket
 3. Create the following policies:
 
    **Policy 1: Public Read Access**
    - Policy name: "Public can view photos"
    - Allowed operation: SELECT
    - Target roles: `anon`, `authenticated`
-   - USING expression: `bucket_id = 'photos'`
+   - USING expression: `bucket_id = 'portfolio'`
 
    **Policy 2: Authenticated Upload**
    - Policy name: "Authenticated users can upload"
    - Allowed operation: INSERT
    - Target roles: `authenticated`
-   - WITH CHECK expression: `bucket_id = 'photos'`
+   - WITH CHECK expression: `bucket_id = 'portfolio'`
 
    **Policy 3: Authenticated Update**
    - Policy name: "Authenticated users can update"
    - Allowed operation: UPDATE
    - Target roles: `authenticated`
-   - USING expression: `bucket_id = 'photos'`
-   - WITH CHECK expression: `bucket_id = 'photos'`
+   - USING expression: `bucket_id = 'portfolio'`
+   - WITH CHECK expression: `bucket_id = 'portfolio'`
 
    **Policy 4: Authenticated Delete**
    - Policy name: "Authenticated users can delete"
    - Allowed operation: DELETE
    - Target roles: `authenticated`
-   - USING expression: `bucket_id = 'photos'`
+   - USING expression: `bucket_id = 'portfolio'`
 
 #### Option B: Via SQL (if you have the necessary permissions)
 
@@ -66,7 +66,7 @@ Run the SQL commands in `002_create_storage_policies.sql` in the SQL Editor.
 After running the migrations:
 
 1. Check that the `photos` table exists in **Table Editor**
-2. Verify the storage bucket `photos` exists in **Storage**
+2. Verify the storage bucket `portfolio` exists in **Storage**
 3. Test uploading a photo through the admin panel at `/protected/admin`
 
 ## Database Schema

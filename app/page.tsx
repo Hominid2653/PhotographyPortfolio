@@ -57,7 +57,7 @@ export default function Home() {
                 Professional photography services tailored for your graduation
                 celebration
               </p>
-            </div>
+        </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <Card>
@@ -123,9 +123,9 @@ export default function Home() {
                 </Button>
               </CardContent>
             </Card>
-          </div>
+      </div>
         </section>
-      </main>
+    </main>
 
       <Footer />
     </div>

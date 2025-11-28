@@ -103,7 +103,7 @@ export async function getPhotoById(id: string): Promise<PhotoWithUrl | null> {
   }
 
   const { data } = supabase.storage
-    .from("photos")
+    .from("portfolio")
     .getPublicUrl(photo.file_path);
 
   return {
@@ -192,7 +192,7 @@ export async function uploadPhoto(
 
   if (dbError) {
     // If database insert fails, try to clean up the uploaded file
-    await supabase.storage.from("photos").remove([filePath]);
+    await supabase.storage.from("portfolio").remove([filePath]);
     console.error("Error creating photo record:", dbError);
     throw dbError;
   }
@@ -219,7 +219,7 @@ export async function deletePhoto(id: string): Promise<void> {
 
   // Delete from storage
   const { error: storageError } = await supabase.storage
-    .from("photos")
+    .from("portfolio")
     .remove([photo.file_path]);
 
   if (storageError) {

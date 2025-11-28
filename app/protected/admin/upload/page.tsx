@@ -127,18 +127,28 @@ export default function UploadPhotosPage() {
           console.error(`Error uploading ${file.name}:`, error);
           progress[fileKey] = false;
           setUploadProgress({ ...progress });
-          // Show user-friendly error message
+          
+          // Log detailed error information
           const errorMessage =
             error instanceof Error ? error.message : "Unknown error occurred";
-          if (
-            errorMessage.includes("bucket") ||
-            errorMessage.includes("tenant") ||
-            errorMessage.includes("Invalid")
-          ) {
-            alert(
-              `Upload failed: ${errorMessage}\n\nPlease ensure:\n1. The "photos" storage bucket exists in Supabase\n2. Your Supabase environment variables are correct\n3. You have proper storage permissions`
-            );
-          }
+          const errorDetails = error instanceof Error ? {
+            message: error.message,
+            name: error.name,
+            stack: error.stack,
+          } : error;
+          
+          console.error("Upload error details:", {
+            fileName: file.name,
+            fileSize: file.size,
+            fileType: file.type,
+            error: errorDetails,
+          });
+
+          // Show user-friendly error message
+          alert(
+            `Upload failed for "${file.name}":\n\n${errorMessage}\n\n` +
+            `Check the browser console for detailed error information.`
+          );
         }
       }
 

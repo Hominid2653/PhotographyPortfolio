@@ -15,7 +15,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { Home, Image, Upload, Images, LogOut } from "lucide-react";
+import { Home, Image, Upload, Images, LogOut, Settings } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,11 @@ const menuItems = [
     title: "All Photos",
     url: "/protected/admin/photos",
     icon: Images,
+  },
+  {
+    title: "Test Connection",
+    url: "/protected/admin/test-connection",
+    icon: Settings,
   },
 ];
 

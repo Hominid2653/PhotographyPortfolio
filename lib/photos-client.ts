@@ -27,9 +27,9 @@ export async function getVisiblePhotosClient(): Promise<PhotoWithUrl[]> {
 
   // Get public URLs for each photo
   const photosWithUrls: PhotoWithUrl[] = (photos || []).map((photo) => {
-    const { data } = supabase.storage
-      .from("photos")
-      .getPublicUrl(photo.file_path);
+  const { data } = supabase.storage
+    .from("portfolio")
+    .getPublicUrl(photo.file_path);
 
     return {
       ...photo,
@@ -58,9 +58,9 @@ export async function getAllPhotosClient(): Promise<PhotoWithUrl[]> {
 
   // Get public URLs for each photo
   const photosWithUrls: PhotoWithUrl[] = (photos || []).map((photo) => {
-    const { data } = supabase.storage
-      .from("photos")
-      .getPublicUrl(photo.file_path);
+  const { data } = supabase.storage
+    .from("portfolio")
+    .getPublicUrl(photo.file_path);
 
     return {
       ...photo,
@@ -86,54 +86,133 @@ export async function uploadPhotoClient(
 ): Promise<PhotoMetadata> {
   const supabase = createClient();
 
-  // Get current user
+  // Verify environment variables are set
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    throw new Error("NEXT_PUBLIC_SUPABASE_URL is not set in environment variables");
+  }
+  if (!process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) {
+    throw new Error("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY is not set in environment variables");
+  }
+
+  // Get current user and session
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
+
+  if (authError) {
+    throw new Error(`Authentication error: ${authError.message}`);
+  }
 
   if (!user) {
     throw new Error("User must be authenticated to upload photos");
   }
+
+  // Verify we have a valid session
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.warn("Session error:", sessionError);
+  }
+  
+  if (!session) {
+    throw new Error("No active session. Please log in again.");
+  }
+
+  console.log("Upload authentication check:", {
+    userId: user.id,
+    userEmail: user.email,
+    hasSession: !!session,
+    sessionExpiresAt: session?.expires_at,
+  });
 
   // Generate unique filename
   const fileExt = file.name.split(".").pop();
   const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
   const filePath = fileName;
 
-  // Check if bucket exists first
-  const { data: buckets, error: bucketError } = await supabase.storage.listBuckets();
-  
-  if (bucketError) {
-    console.error("Error checking buckets:", bucketError);
-    throw new Error(`Failed to access storage: ${bucketError.message}`);
+  // Try to list buckets (non-blocking - won't fail if this errors)
+  let bucketVerified = false;
+  try {
+    const { data: buckets, error: bucketError } = await supabase.storage.listBuckets();
+    if (!bucketError && buckets) {
+      bucketVerified = buckets.some((bucket) => bucket.name === "portfolio");
+      if (bucketVerified) {
+        console.log("Bucket 'portfolio' verified via listBuckets()");
+      }
+    }
+  } catch (error) {
+    // listBuckets() can fail with "Invalid tenant id" even when bucket access works
+    // This is a known Supabase issue, so we'll continue with upload anyway
+    console.log("Could not verify bucket via listBuckets (non-critical):", error);
   }
 
-  const photosBucket = buckets?.find((bucket) => bucket.name === "PHOTOS" || bucket.name === "photos");
-  const bucketName = photosBucket?.name || "PHOTOS";
-  
-  if (!photosBucket) {
-    throw new Error(
-      'Storage bucket "PHOTOS" does not exist. Please create it in your Supabase dashboard under Storage.'
-    );
+  // Ensure we have a fresh session before uploading
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.warn("Session error (non-critical):", sessionError);
   }
 
   // Upload file to storage
-  const { error: uploadError } = await supabase.storage
-    .from(bucketName)
+  console.log("Attempting to upload file:", {
+    fileName: file.name,
+    fileSize: file.size,
+    fileType: file.type,
+    filePath,
+    bucket: "portfolio",
+    hasSession: !!session,
+    userId: user.id,
+  });
+
+  const { data: uploadData, error: uploadError } = await supabase.storage
+    .from("portfolio")
     .upload(filePath, file, {
       cacheControl: "3600",
       upsert: false,
     });
 
   if (uploadError) {
-    console.error("Error uploading file:", uploadError);
+    console.error("Upload error details:", {
+      message: uploadError.message,
+      statusCode: uploadError.statusCode,
+      error: uploadError,
+      fileName: file.name,
+      fileSize: file.size,
+      filePath,
+    });
+
+    // Provide detailed error information
     if (uploadError.message?.includes("tenant") || uploadError.message?.includes("Invalid")) {
       throw new Error(
-        'Invalid Supabase configuration. Please check your NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY environment variables, and ensure the "photos" storage bucket exists.'
+        `Storage upload failed: ${uploadError.message}\n\n` +
+        `This might be a storage provisioning issue. Please:\n` +
+        `1. Verify the 'portfolio' bucket exists in Supabase Dashboard\n` +
+        `2. Check storage policies allow authenticated uploads\n` +
+        `3. Try uploading a file manually in the dashboard to verify bucket access\n` +
+        `4. Check browser console for detailed error information`
       );
     }
-    throw uploadError;
+
+    if (uploadError.message?.includes("new row violates row-level security")) {
+      throw new Error(
+        `Upload failed: Permission denied\n\n` +
+        `Storage policy issue. Please check:\n` +
+        `1. Go to Supabase Dashboard > Storage > Policies\n` +
+        `2. Ensure 'Authenticated users can upload photos' policy exists for 'portfolio' bucket\n` +
+        `3. Policy should have: WITH CHECK expression: bucket_id = 'portfolio'`
+      );
+    }
+
+    if (uploadError.message?.includes("not found") || uploadError.message?.includes("does not exist")) {
+      throw new Error(
+        `Upload failed: Bucket 'portfolio' not found\n\n` +
+        `Please create the 'portfolio' bucket in Supabase Dashboard > Storage`
+      );
+    }
+
+    throw new Error(`Upload failed: ${uploadError.message}`);
   }
+
+  console.log("File uploaded successfully:", uploadData);
 
   // Get image dimensions if it's an image
   let width: number | undefined;
@@ -173,7 +252,7 @@ export async function uploadPhotoClient(
 
   if (dbError) {
     // If database insert fails, try to clean up the uploaded file
-    await supabase.storage.from("photos").remove([filePath]);
+    await supabase.storage.from("portfolio").remove([filePath]);
     console.error("Error creating photo record:", dbError);
     throw dbError;
   }
@@ -200,7 +279,7 @@ export async function deletePhotoClient(id: string): Promise<void> {
 
   // Delete from storage
   const { error: storageError } = await supabase.storage
-    .from("photos")
+    .from("portfolio")
     .remove([photo.file_path]);
 
   if (storageError) {
