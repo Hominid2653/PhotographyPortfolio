@@ -3,6 +3,8 @@
 import { useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { AdminSidebar } from "@/components/admin-sidebar";
 
 export default function AdminPage() {
   const router = useRouter();
@@ -19,5 +21,12 @@ export default function AdminPage() {
     }
   };
 
-  return <div className="min-h-screen bg-white" />;
+  return (
+    <SidebarProvider>
+      <AdminSidebar />
+      <SidebarInset>
+        <div className="min-h-screen bg-white" />
+      </SidebarInset>
+    </SidebarProvider>
+  );
 }
