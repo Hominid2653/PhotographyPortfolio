@@ -108,10 +108,22 @@ export async function uploadPhotoClient(
     throw new Error("User must be authenticated to upload photos");
   }
 
-  // Verify we have a valid session
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  // Verify we have a valid session and refresh if needed
+  let { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  
   if (sessionError) {
     console.warn("Session error:", sessionError);
+  }
+  
+  // If session is expired or missing, try to refresh it
+  if (!session || (session.expires_at && session.expires_at * 1000 < Date.now())) {
+    console.log("Session expired or missing, attempting refresh...");
+    const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+    if (refreshError) {
+      console.error("Failed to refresh session:", refreshError);
+      throw new Error("Session expired. Please log in again.");
+    }
+    session = refreshedSession;
   }
   
   if (!session) {
@@ -122,6 +134,7 @@ export async function uploadPhotoClient(
     userId: user.id,
     userEmail: user.email,
     hasSession: !!session,
+    hasAccessToken: !!session?.access_token,
     sessionExpiresAt: session?.expires_at,
   });
 
@@ -146,12 +159,6 @@ export async function uploadPhotoClient(
     console.log("Could not verify bucket via listBuckets (non-critical):", error);
   }
 
-  // Ensure we have a fresh session before uploading
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-  if (sessionError) {
-    console.warn("Session error (non-critical):", sessionError);
-  }
-
   // Upload file to storage
   console.log("Attempting to upload file:", {
     fileName: file.name,
@@ -160,15 +167,63 @@ export async function uploadPhotoClient(
     filePath,
     bucket: "portfolio",
     hasSession: !!session,
+    hasAccessToken: !!session?.access_token,
     userId: user.id,
+    userEmail: user.email,
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
   });
 
-  const { data: uploadData, error: uploadError } = await supabase.storage
-    .from("portfolio")
-    .upload(filePath, file, {
-      cacheControl: "3600",
-      upsert: false,
-    });
+  // Try upload with Supabase client first
+  let uploadData;
+  let uploadError;
+  
+  try {
+    const result = await supabase.storage
+      .from("portfolio")
+      .upload(filePath, file, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: file.type,
+      });
+    
+    uploadData = result.data;
+    uploadError = result.error;
+    
+    // If upload fails with 400/tenant error, try direct API call with explicit auth header
+    if (uploadError && (uploadError.statusCode === 400 || uploadError.message?.includes("tenant"))) {
+      console.log("Supabase client upload failed, trying direct API call with explicit auth...");
+      
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const uploadUrl = `${supabaseUrl}/storage/v1/object/portfolio/${filePath}`;
+      
+      const formData = new FormData();
+      formData.append("file", file);
+      
+      const response = await fetch(uploadUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+        },
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Direct upload failed: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+      
+      const result = await response.json();
+      uploadData = result;
+      uploadError = null;
+      console.log("Direct API upload succeeded:", result);
+    }
+  } catch (directError) {
+    // If direct upload also fails, use the original error
+    if (!uploadError) {
+      uploadError = directError as any;
+    }
+  }
 
   if (uploadError) {
     console.error("Upload error details:", {

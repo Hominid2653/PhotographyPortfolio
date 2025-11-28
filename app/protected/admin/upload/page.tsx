@@ -127,16 +127,19 @@ export default function UploadPhotosPage() {
           console.error(`Error uploading ${file.name}:`, error);
           progress[fileKey] = false;
           setUploadProgress({ ...progress });
-          
+
           // Log detailed error information
           const errorMessage =
             error instanceof Error ? error.message : "Unknown error occurred";
-          const errorDetails = error instanceof Error ? {
-            message: error.message,
-            name: error.name,
-            stack: error.stack,
-          } : error;
-          
+          const errorDetails =
+            error instanceof Error
+              ? {
+                  message: error.message,
+                  name: error.name,
+                  stack: error.stack,
+                }
+              : error;
+
           console.error("Upload error details:", {
             fileName: file.name,
             fileSize: file.size,
@@ -147,7 +150,7 @@ export default function UploadPhotosPage() {
           // Show user-friendly error message
           alert(
             `Upload failed for "${file.name}":\n\n${errorMessage}\n\n` +
-            `Check the browser console for detailed error information.`
+              `Check the browser console for detailed error information.`
           );
         }
       }

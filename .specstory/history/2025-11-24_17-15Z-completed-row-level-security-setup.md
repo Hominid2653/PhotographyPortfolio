@@ -12156,3 +12156,967 @@ Lint results
 
 ---
 
+
+Adding more detailed error logging to the upload page to capture the exact error:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: app/protected/admin/upload/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **code_edit** • Edit file: app/protected/admin/upload/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 20, lines removed: 10
+
+```diff
+@@ -128,16 +128,26 @@
+            progress[fileKey] = false;
+            setUploadProgress({ ...progress });
+-           // Show user-friendly error message
++           
++           // Log detailed error information
+            const errorMessage =
+              error instanceof Error ? error.message : &quot;Unknown error occurred&quot;;
+-           if (
+-             errorMessage.includes(&quot;bucket&quot;) ||
+-             errorMessage.includes(&quot;tenant&quot;) ||
+-             errorMessage.includes(&quot;Invalid&quot;)
+-           ) {
+-             alert(
+-               &#96;Upload failed: ${errorMessage}\n\nPlease ensure:\n1. The &quot;portfolio&quot; storage bucket exists in Supabase\n2. Your Supabase environment variables are correct\n3. You have proper storage permissions&#96;
+-             );
+-           }
++           const errorDetails = error instanceof Error ? {
++             message: error.message,
++             name: error.name,
++             stack: error.stack,
++           } : error;
++           
++           console.error(&quot;Upload error details:&quot;, {
++             fileName: file.name,
++             fileSize: file.size,
++             fileType: file.type,
++             error: errorDetails,
++           });
++ 
++           // Show user-friendly error message
++           alert(
++             &#96;Upload failed for &quot;${file.name}&quot;:\n\n${errorMessage}\n\n&#96; +
++             &#96;Check the browser console for detailed error information.&#96;
++           );
+          }
+        }
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 2 files</summary>
+      
+Lint paths:
+
+- `app/protected/admin/upload/page.tsx`
+- `lib/photos-client.ts`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Restored bucket listing (non-blocking) and improved error logging. Adding a session check to ensure authentication is working:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **code_edit** • Edit file: lib/photos-client.ts</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -95,5 +95,5 @@
+    }
+  
+-   // Get current user
++   // Get current user and session
+    const {
+      data: { user },
+```
+
+**Chunk 2**
+Lines added: 17, lines removed: undefined
+
+```diff
+@@ -108,4 +108,21 @@
+      throw new Error(&quot;User must be authenticated to upload photos&quot;);
+    }
++ 
++   // Verify we have a valid session
++   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
++   if (sessionError) {
++     console.warn(&quot;Session error:&quot;, sessionError);
++   }
++   
++   if (!session) {
++     throw new Error(&quot;No active session. Please log in again.&quot;);
++   }
++ 
++   console.log(&quot;Upload authentication check:&quot;, {
++     userId: user.id,
++     userEmail: user.email,
++     hasSession: !!session,
++     sessionExpiresAt: session?.expires_at,
++   });
+  
+    // Generate unique filename
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `lib/photos-client.ts`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+
+---
+
+
+Removing the duplicate session check:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: lib/photos-client.ts</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **code_edit** • Edit file: lib/photos-client.ts</summary>
+
+**Chunk 1**
+Lines added: undefined, lines removed: 6
+
+```diff
+@@ -146,10 +146,4 @@
+      console.log(&quot;Could not verify bucket via listBuckets (non-critical):&quot;, error);
+    }
+- 
+-   // Ensure we have a fresh session before uploading
+-   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+-   if (sessionError) {
+-     console.warn(&quot;Session error (non-critical):&quot;, sessionError);
+-   }
+  
+    // Upload file to storage
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `lib/photos-client.ts`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Checking for middleware or cookie handling issues. Verifying the Supabase client configuration:
+
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="glob_file_search">
+<details>
+<summary>Tool use: **glob_file_search** • Searched codebase "**/middleware.ts" • **0** result in **1** directory</summary>
+
+Directory: **c:\Users\USER\Desktop\Projects\graduation** (0 file)
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: lib/supabase/client.ts</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="codebase_search">
+<details>
+                <summary>Tool use: **codebase_search** • Searched codebase "How is Supabase SSR configured with cookies and middleware for authentication?" • **15** results</summary>
+            
+| File | Lines |
+|------|-------|
+| `lib/supabase/proxy.ts` | L75 |
+| `lib/supabase/server.ts` | L33 |
+| `lib/supabase/proxy.ts` | L1-75 |
+| `proxy.ts` | L19 |
+| `lib/supabase/client.ts` | L7 |
+| `README.md` | L46 |
+| `app/auth/confirm/route.ts` | L29 |
+| `app/protected/page.tsx` | L42 |
+| `README.md` | L75-109 |
+| `next.config.ts` | L14 |
+| `README.md` | L44-79 |
+| `components/login-form.tsx` | L109 |
+| `supabase/README.md` | L62 |
+| `package.json` | L58 |
+| `proxy.ts` | L3-19 |
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+The `createBrowserClient` needs cookie handling to send the auth session. Updating the client configuration:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **code_edit** • Edit file: lib/supabase/client.ts</summary>
+
+**Chunk 1**
+Lines added: 35, lines removed: undefined
+
+```diff
+@@ -5,4 +5,39 @@
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
++     {
++       cookies: {
++         getAll() {
++           return document.cookie.split(&quot;; &quot;).map((cookie) =&gt; {
++             const [name, ...rest] = cookie.split(&quot;=&quot;);
++             return { name, value: rest.join(&quot;=&quot;) };
++           });
++         },
++         setAll(cookiesToSet) {
++           cookiesToSet.forEach(({ name, value, options }) =&gt; {
++             let cookieString = &#96;${name}=${value}&#96;;
++             if (options?.maxAge) {
++               cookieString += &#96;; max-age=${options.maxAge}&#96;;
++             }
++             if (options?.path) {
++               cookieString += &#96;; path=${options.path}&#96;;
++             }
++             if (options?.domain) {
++               cookieString += &#96;; domain=${options.domain}&#96;;
++             }
++             if (options?.sameSite) {
++               cookieString += &#96;; samesite=${options.sameSite}&#96;;
++             }
++             if (options?.secure) {
++               cookieString += &#96;; secure&#96;;
++             }
++             if (options?.httpOnly) {
++               // httpOnly cookies cannot be set from client-side JavaScript
++               return;
++             }
++             document.cookie = cookieString;
++           });
++         },
++       },
++     }
+    );
+  }
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `lib/supabase/client.ts`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Checking if `createBrowserClient` handles cookies automatically. Reviewing the Supabase SSR docs and simplifying the client:
+
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="web_search">
+<details>
+            <summary>Tool use: **web_search** • Searched web `supabase ssr createBrowserClient cookies authentication storage upload` • **1** results</summary>
+        
+| Title | URL | Chunk |
+|-------|-----|-------|
+| Web Search Results |  | I'm sorry to hear you're encountering an "Invalid Tenant ID" error when attempting to upload files to Supabase Storage. This error typically indicates an issue with the configuration or authentication setup. Let's explore some potential causes and solutions:<br/><br/>1. **Tenant Configuration Issues**: The "Invalid Tenant ID" error suggests that the storage service is unable to locate the specified tenant configuration. This can occur if the storage service wasn't provisioned correctly. To address this, consider contacting Supabase support for assistance. ([supabase.com](https://supabase.com/docs/guides/storage/debugging/error-codes?utm_source=openai))<br/><br/>2. **Authentication and Authorization**:<br/>   - **JWT Authentication**: Ensure that your application is providing a valid JSON Web Token (JWT) during the upload process. An invalid or missing JWT can lead to authentication errors. ([deepwiki.com](https://deepwiki.com/supabase/storage/2.3-authentication?utm_source=openai))<br/>   - **Row Level Security (RLS) Policies**: Verify that the RLS policies for your storage bucket are correctly configured. Even if a bucket is public, operations like uploading require appropriate RLS policies to grant the necessary permissions. ([supabase.com](https://supabase.com/docs/guides/troubleshooting/why-cant-i-uploadlistetc-my-public-bucket-Z6CmGt?utm_source=openai))<br/><br/>3. **Bucket and Object Naming**:<br/>   - **Bucket Existence**: Confirm that the bucket you're trying to upload to exists and is correctly named. A mismatch in the bucket name can result in errors.<br/>   - **Object Naming Conventions**: Ensure that the object names (file paths) adhere to valid naming conventions. Avoid using special characters or non-ASCII characters, as they can cause issues during the upload process. ([community.weweb.io](https://community.weweb.io/t/issue-with-file-upload-supabase/8831?utm_source=openai))<br/><br/>4. **Supabase Client Initialization**: When initializing the Supabase client, ensure that you're using the correct project URL and API keys. Misconfiguration here can lead to various errors, including authentication issues.<br/><br/>5. **Error Handling and Logging**: Implement comprehensive error handling in your application to capture and log detailed error messages. This can provide more context on the issue and assist in troubleshooting.<br/><br/>If after these steps the issue persists, it would be beneficial to review your application's code and configuration settings related to Supabase Storage. Additionally, reaching out to Supabase support with detailed information about your setup can provide more targeted assistance. |
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: lib/supabase/client.ts</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Simplifying the client. `createBrowserClient` should handle cookies automatically. The issue is likely RLS policies or session handling. Restoring the original client and ensuring the session is properly used:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **code_edit** • Edit file: lib/supabase/client.ts</summary>
+
+**Chunk 1**
+Lines added: undefined, lines removed: 35
+
+```diff
+@@ -5,39 +5,4 @@
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+-     {
+-       cookies: {
+-         getAll() {
+-           return document.cookie.split(&quot;; &quot;).map((cookie) =&gt; {
+-             const [name, ...rest] = cookie.split(&quot;=&quot;);
+-             return { name, value: rest.join(&quot;=&quot;) };
+-           });
+-         },
+-         setAll(cookiesToSet) {
+-           cookiesToSet.forEach(({ name, value, options }) =&gt; {
+-             let cookieString = &#96;${name}=${value}&#96;;
+-             if (options?.maxAge) {
+-               cookieString += &#96;; max-age=${options.maxAge}&#96;;
+-             }
+-             if (options?.path) {
+-               cookieString += &#96;; path=${options.path}&#96;;
+-             }
+-             if (options?.domain) {
+-               cookieString += &#96;; domain=${options.domain}&#96;;
+-             }
+-             if (options?.sameSite) {
+-               cookieString += &#96;; samesite=${options.sameSite}&#96;;
+-             }
+-             if (options?.secure) {
+-               cookieString += &#96;; secure&#96;;
+-             }
+-             if (options?.httpOnly) {
+-               // httpOnly cookies cannot be set from client-side JavaScript
+-               return;
+-             }
+-             document.cookie = cookieString;
+-           });
+-         },
+-       },
+-     }
+    );
+  }
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: lib/photos-client.ts</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Fixing the session reference in the upload logging:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **code_edit** • Edit file: lib/photos-client.ts</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -156,4 +156,5 @@
+      hasSession: !!session,
+      userId: user.id,
++     userEmail: user.email,
+    });
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `lib/photos-client.ts`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+## Changes Made:
+
+1. **Restored bucket listing** — Non-blocking; won't fail if `listBuckets()` has issues
+2. **Added session verification** — Ensures a valid session before uploading
+3. **Enhanced error logging** — Detailed console logs for debugging
+4. **Improved error messages** — More specific errors for common issues
+
+## What to Check:
+
+1. Open the browser console (F12) and try uploading an image
+2. Look for the detailed logs showing:
+   - Authentication status
+   - Session information
+   - Upload attempt details
+   - Exact error messages
+
+3. Verify Storage Policies in Supabase Dashboard:
+   - Go to Storage → Policies
+   - Ensure there's a policy for INSERT operations on the "portfolio" bucket
+   - Policy should target `authenticated` role
+   - WITH CHECK expression: `bucket_id = 'portfolio'`
+
+4. Check the error message in the console — it will indicate:
+   - Permission denied → RLS policy issue
+   - Bucket not found → Bucket doesn't exist
+   - Invalid tenant → Storage provisioning issue
+   - Other errors → Will show the exact problem
+
+Try uploading again and share the console error message. The enhanced logging should pinpoint the issue.
+
+---
+
+_**User (2025-11-28 08:07Z)**_
+
+error 400
+
+---
+
+_**Agent (model default, mode Agent)**_
+
+
+
+---
+
+
+400 "Invalid tenant id" indicates the storage request isn't authenticated or the tenant ID isn't being sent. Since dashboard uploads work, this points to a client-side auth issue. Checking how the Supabase client sends auth headers for storage requests:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: lib/photos-client.ts</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="codebase_search">
+<details>
+                <summary>Tool use: **codebase_search** • Searched codebase "How does Supabase storage upload send authentication headers and session tokens?" • **13** results</summary>
+            
+| File | Lines |
+|------|-------|
+| `lib/photos-client.ts` | L45-255 |
+| `lib/photos-client.ts` | L71-255 |
+| `lib/photos.ts` | L90-200 |
+| `lib/supabase/proxy.ts` | L75 |
+| `lib/supabase/server.ts` | L33 |
+| `supabase/migrations/002_create_storage_policies.sql` | L52 |
+| `supabase/README.md` | L62 |
+| `app/protected/admin/upload/page.tsx` | L27-367 |
+| `app/protected/admin/test-connection/page.tsx` | L28-533 |
+| `lib/photos-client.ts` | L71-291 |
+| `lib/supabase/client.ts` | L7 |
+| `app/protected/admin/upload/page.tsx` | L29-367 |
+| `proxy.ts` | L19 |
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: app/protected/admin/upload/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Fixing a syntax error and ensuring the session token is sent with storage requests. The 400 error suggests the auth token isn't being included. Updating the code:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: lib/photos-client.ts</summary>
+
+</details>
+</tool-use>
+
+---
+
+The string to replace was not found in the file.
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: lib/photos-client.ts</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+The 400 "Invalid tenant id" suggests the auth token isn't being sent with storage requests. Ensuring the session is refreshed and explicitly attached. Updating the upload function to handle this:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **code_edit** • Edit file: lib/photos-client.ts</summary>
+
+**Chunk 1**
+Lines added: 14, lines removed: 2
+
+```diff
+@@ -109,9 +109,21 @@
+    }
+  
+-   // Verify we have a valid session
+-   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
++   // Verify we have a valid session and refresh if needed
++   let { data: { session }, error: sessionError } = await supabase.auth.getSession();
++   
+    if (sessionError) {
+      console.warn(&quot;Session error:&quot;, sessionError);
+    }
++   
++   // If session is expired or missing, try to refresh it
++   if (!session || (session.expires_at &amp;&amp; session.expires_at * 1000 &lt; Date.now())) {
++     console.log(&quot;Session expired or missing, attempting refresh...&quot;);
++     const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
++     if (refreshError) {
++       console.error(&quot;Failed to refresh session:&quot;, refreshError);
++       throw new Error(&quot;Session expired. Please log in again.&quot;);
++     }
++     session = refreshedSession;
++   }
+    
+    if (!session) {
+```
+
+**Chunk 2**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -123,4 +135,5 @@
+      userEmail: user.email,
+      hasSession: !!session,
++     hasAccessToken: !!session?.access_token,
+      sessionExpiresAt: session?.expires_at,
+    });
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **code_edit** • Edit file: lib/photos-client.ts</summary>
+
+**Chunk 1**
+Lines added: 4, lines removed: undefined
+
+```diff
+@@ -168,13 +168,17 @@
+      bucket: &quot;portfolio&quot;,
+      hasSession: !!session,
++     hasAccessToken: !!session?.access_token,
+      userId: user.id,
+      userEmail: user.email,
+    });
+  
++   // Ensure we&#39;re using a client with the current session
++   // The Supabase client should automatically include the session token in requests
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from(&quot;portfolio&quot;)
+      .upload(filePath, file, {
+        cacheControl: &quot;3600&quot;,
+        upsert: false,
++       contentType: file.type,
+      });
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `lib/photos-client.ts`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Checking if we need middleware to handle storage requests. The 400 error may indicate the auth token isn't being sent. Verifying the Supabase client configuration:
+
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="glob_file_search">
+<details>
+<summary>Tool use: **glob_file_search** • Searched codebase "**/middleware.ts" • **0** result in **1** directory</summary>
+
+Directory: **c:\Users\USER\Desktop\Projects\graduation** (0 file)
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: next.config.ts</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="codebase_search">
+<details>
+                <summary>Tool use: **codebase_search** • Searched codebase "How are Supabase storage requests handled with authentication in Next.js middleware?" • **15** results</summary>
+            
+| File | Lines |
+|------|-------|
+| `lib/supabase/proxy.ts` | L75 |
+| `proxy.ts` | L19 |
+| `lib/supabase/server.ts` | L33 |
+| `supabase/README.md` | L62 |
+| `supabase/migrations/002_create_storage_policies.sql` | L52 |
+| `app/protected/admin/test-connection/page.tsx` | L28-533 |
+| `lib/photos-client.ts` | L45-272 |
+| `next.config.ts` | L14 |
+| `app/protected/page.tsx` | L42 |
+| `lib/photos-client.ts` | L71-272 |
+| `lib/supabase/proxy.ts` | L1-75 |
+| `lib/photos.ts` | L90-200 |
+| `proxy.ts` | L3-19 |
+| `app/protected/admin/upload/page.tsx` | L27-367 |
+| `lib/supabase/client.ts` | L7 |
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+The 400 error suggests the auth token isn't being sent with storage requests. Adding a direct upload method using the access token:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: lib/photos-client.ts</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **code_edit** • Edit file: lib/photos-client.ts</summary>
+
+**Chunk 1**
+Lines added: 52, lines removed: 9
+
+```diff
+@@ -171,15 +171,58 @@
+      userId: user.id,
+      userEmail: user.email,
++     supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    });
+  
+-   // Ensure we&#39;re using a client with the current session
+-   // The Supabase client should automatically include the session token in requests
+-   const { data: uploadData, error: uploadError } = await supabase.storage
+-     .from(&quot;portfolio&quot;)
+-     .upload(filePath, file, {
+-       cacheControl: &quot;3600&quot;,
+-       upsert: false,
+-       contentType: file.type,
+-     });
++   // Try upload with Supabase client first
++   let uploadData;
++   let uploadError;
++   
++   try {
++     const result = await supabase.storage
++       .from(&quot;portfolio&quot;)
++       .upload(filePath, file, {
++         cacheControl: &quot;3600&quot;,
++         upsert: false,
++         contentType: file.type,
++       });
++     
++     uploadData = result.data;
++     uploadError = result.error;
++     
++     // If upload fails with 400/tenant error, try direct API call with explicit auth header
++     if (uploadError &amp;&amp; (uploadError.statusCode === 400 || uploadError.message?.includes(&quot;tenant&quot;))) {
++       console.log(&quot;Supabase client upload failed, trying direct API call with explicit auth...&quot;);
++       
++       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
++       const uploadUrl = &#96;${supabaseUrl}/storage/v1/object/portfolio/${filePath}&#96;;
++       
++       const formData = new FormData();
++       formData.append(&quot;file&quot;, file);
++       
++       const response = await fetch(uploadUrl, {
++         method: &quot;POST&quot;,
++         headers: {
++           Authorization: &#96;Bearer ${session.access_token}&#96;,
++           apikey: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
++         },
++         body: formData,
++       });
++       
++       if (!response.ok) {
++         const errorText = await response.text();
++         throw new Error(&#96;Direct upload failed: ${response.status} ${response.statusText} - ${errorText}&#96;);
++       }
++       
++       const result = await response.json();
++       uploadData = result;
++       uploadError = null;
++       console.log(&quot;Direct API upload succeeded:&quot;, result);
++     }
++   } catch (directError) {
++     // If direct upload also fails, use the original error
++     if (!uploadError) {
++       uploadError = directError as any;
++     }
++   }
+  
+    if (uploadError) {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `lib/photos-client.ts`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Added a fallback that uses a direct API call with explicit auth headers if the Supabase client upload fails. This should help if the client isn't sending the auth token.
+
+## Summary of Changes:
+
+1. **Session refresh** — Refreshes the session if expired before upload
+2. **Enhanced logging** — Logs session and token status
+3. **Direct API fallback** — If the Supabase client fails with a 400/tenant error, it tries a direct fetch with explicit auth headers
+4. **Better error handling** — More specific error messages
+
+## Next Steps:
+
+1. Try uploading an image again
+2. Check the browser console for:
+   - Whether the session has an access token
+   - Whether the direct API fallback is triggered
+   - The exact error message
+
+The direct API approach explicitly sets the `Authorization` header with the access token, which should work even if the Supabase client has issues sending it.
+
+If it still fails, share the console error message so we can debug further. The 400 error with "Invalid tenant id" when authenticated usually means the auth token isn't being sent or recognized by the storage API.
+
+---
+
