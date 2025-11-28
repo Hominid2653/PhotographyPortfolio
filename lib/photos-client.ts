@@ -100,9 +100,26 @@ export async function uploadPhotoClient(
   const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
   const filePath = fileName;
 
+  // Check if bucket exists first
+  const { data: buckets, error: bucketError } = await supabase.storage.listBuckets();
+  
+  if (bucketError) {
+    console.error("Error checking buckets:", bucketError);
+    throw new Error(`Failed to access storage: ${bucketError.message}`);
+  }
+
+  const photosBucket = buckets?.find((bucket) => bucket.name === "PHOTOS" || bucket.name === "photos");
+  const bucketName = photosBucket?.name || "PHOTOS";
+  
+  if (!photosBucket) {
+    throw new Error(
+      'Storage bucket "PHOTOS" does not exist. Please create it in your Supabase dashboard under Storage.'
+    );
+  }
+
   // Upload file to storage
   const { error: uploadError } = await supabase.storage
-    .from("photos")
+    .from(bucketName)
     .upload(filePath, file, {
       cacheControl: "3600",
       upsert: false,
@@ -110,6 +127,11 @@ export async function uploadPhotoClient(
 
   if (uploadError) {
     console.error("Error uploading file:", uploadError);
+    if (uploadError.message?.includes("tenant") || uploadError.message?.includes("Invalid")) {
+      throw new Error(
+        'Invalid Supabase configuration. Please check your NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY environment variables, and ensure the "photos" storage bucket exists.'
+      );
+    }
     throw uploadError;
   }
 

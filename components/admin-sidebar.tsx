@@ -15,7 +15,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { Home, Image, Settings, LogOut } from "lucide-react";
+import { Home, Image, Upload, Images, LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -27,9 +27,14 @@ const menuItems = [
     icon: Home,
   },
   {
-    title: "Photos",
-    url: "/protected/admin",
-    icon: Image,
+    title: "Upload Photos",
+    url: "/protected/admin/upload",
+    icon: Upload,
+  },
+  {
+    title: "All Photos",
+    url: "/protected/admin/photos",
+    icon: Images,
   },
 ];
 
@@ -44,7 +49,7 @@ export function AdminSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" className="border-r">
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>

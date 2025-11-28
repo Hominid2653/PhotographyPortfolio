@@ -110,3 +110,9 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Remove sidebar gap - make content flush with sidebar */
+[data-slot="sidebar-gap"] {
+  width: 0 !important;
+  display: none;
+}
